@@ -34,6 +34,35 @@ describe('migrate', () => {
   });
 });
 
+describe('migrate with foreign keys', () => {
+  const parent = { version: 1, name: '0001_p.sql', sql: 'CREATE TABLE p (id PRIMARY KEY); CREATE TABLE c (p_id REFERENCES p (id) ON DELETE CASCADE);' };
+
+  it('lets a migration rebuild a parent table without cascading, then re-enables enforcement', () => {
+    const db = openDb(':memory:');
+    migrate(db, [parent]);
+    db.exec("INSERT INTO p VALUES ('a'); INSERT INTO c VALUES ('a');");
+    const rebuild = {
+      version: 2,
+      name: '0002_rebuild.sql',
+      sql: 'CREATE TABLE p2 (id PRIMARY KEY, extra); INSERT INTO p2 (id) SELECT id FROM p; DROP TABLE p; ALTER TABLE p2 RENAME TO p;',
+    };
+    migrate(db, [parent, rebuild]);
+    expect(db.prepare('SELECT COUNT(*) FROM c').pluck().get()).toBe(1);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.close();
+  });
+
+  it('refuses a migration that leaves a dangling reference', () => {
+    const db = openDb(':memory:');
+    migrate(db, [parent]);
+    const dangling = { version: 2, name: '0002_bad.sql', sql: "INSERT INTO c VALUES ('missing');" };
+    expect(() => migrate(db, [parent, dangling])).toThrow(/broken reference/);
+    expect(db.prepare('SELECT COUNT(*) FROM c').pluck().get()).toBe(0);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.close();
+  });
+});
+
 describe('snapshot', () => {
   it('writes a readable copy and keeps only the newest N', () => {
     const db = openDb(path.join(dir, 'ferment.db'));

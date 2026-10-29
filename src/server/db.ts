@@ -56,15 +56,33 @@ export function pendingMigrations(db: DB, migrations: Migration[] = readMigratio
   return migrations.filter((m) => !applied.has(m.version));
 }
 
-/** Applies pending migrations, each in its own transaction. Returns the names applied. */
+/**
+ * Applies pending migrations, each in its own transaction. Returns the names applied.
+ *
+ * Foreign keys are off while they run, so a migration can rebuild a table
+ * (create, copy, drop, rename) without the drop cascading into its children.
+ * SQLite ignores that pragma inside a transaction, hence the toggle around
+ * each one; foreign_key_check then refuses to commit a migration that leaves
+ * a dangling reference.
+ */
 export function migrate(db: DB, migrations: Migration[] = readMigrations()): string[] {
   const pending = pendingMigrations(db, migrations);
   const record = db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
-  for (const m of pending) {
-    db.transaction(() => {
-      db.exec(m.sql);
-      record.run(m.version, m.name, new Date().toISOString());
-    })();
+  const enforced = db.pragma('foreign_keys', { simple: true }) === 1;
+  db.pragma('foreign_keys = OFF');
+  try {
+    for (const m of pending) {
+      db.transaction(() => {
+        db.exec(m.sql);
+        const broken = db.pragma('foreign_key_check') as { table: string }[];
+        if (broken.length) {
+          throw new Error(`${m.name} leaves ${broken.length} broken reference(s), first in ${broken[0]!.table}`);
+        }
+        record.run(m.version, m.name, new Date().toISOString());
+      })();
+    }
+  } finally {
+    if (enforced) db.pragma('foreign_keys = ON');
   }
   return pending.map((m) => m.name);
 }
