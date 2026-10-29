@@ -265,6 +265,8 @@ describe('normalized ingredient lines', () => {
     expect((await t.call('PATCH', `/api/catalog/${line.catalog_id}`, { name: 'voda' })).status).toBe(409);
     expect((await t.call('POST', '/api/catalog', { id: id(), name: 'Soľ', kind: 'salt' })).status).toBe(409);
     expect((await t.call('POST', '/api/catalog', { id: id(), name: 'Bell pepper', kind: 'pepper' })).status).toBe(400);
+    const tidy = await t.call('PATCH', `/api/catalog/${line.catalog_id}`, { aliases: ['Cesnak', 'Česnak', 'garlic cloves', 'Cesnek'] });
+    expect(tidy.body.aliases).toEqual(['Cesnak', 'Cesnek']);
   });
 });
 

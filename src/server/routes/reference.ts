@@ -58,6 +58,14 @@ export function referenceRoutes(ctx: AppContext) {
     if (clash) throw new ApiError(409, `“${clash.name}” already has this name or alias`);
   }
 
+  /** Aliases without repeats or the entry's own name, compared folded. */
+  function tidyAliases(table: EntryTable, body: Row, id: string) {
+    if (!Array.isArray(body.aliases)) return;
+    const name = (body.name as string | undefined) ?? (getRow(db, table, id)?.name as string | undefined) ?? '';
+    const seen = new Set([fold(name)]);
+    body.aliases = (body.aliases as string[]).filter((a) => !seen.has(fold(a)) && seen.add(fold(a)));
+  }
+
   /** Lines carry a copy of their entry's name and kind. */
   function propagate(table: EntryTable | 'pepper_lots', id: string) {
     if (table === 'pepper_lots') {
@@ -90,7 +98,10 @@ export function referenceRoutes(ctx: AppContext) {
     r.post(`/${res.path}`, jsonBody(res.schema.create), (c) => {
       const body = c.req.valid('json') as Row & { id: string };
       if (getRow(db, res.table, body.id)) return c.json(one(body.id), 200);
-      if (res.entry) requireUniqueNames(res.entry, body, body.id);
+      if (res.entry) {
+        tidyAliases(res.entry, body, body.id);
+        requireUniqueNames(res.entry, body, body.id);
+      }
       const { now, author } = meta(ctx, c);
       insert(db, res.table, { ...body, created_at: now, updated_at: now, author }, res.cols);
       return c.json(one(body.id), 201);
@@ -100,7 +111,10 @@ export function referenceRoutes(ctx: AppContext) {
       const id = c.req.param('id');
       requireRow(db, res.table, id, res.what);
       const body = c.req.valid('json') as Row;
-      if (res.entry) requireUniqueNames(res.entry, body, id);
+      if (res.entry) {
+        tidyAliases(res.entry, body, id);
+        requireUniqueNames(res.entry, body, id);
+      }
       db.transaction(() => {
         update(db, res.table, id, { ...body, updated_at: meta(ctx, c).now }, res.cols);
         if (res.entry) propagate(res.entry, id);
