@@ -20,6 +20,7 @@ import { invalidate, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety } from '@/lib/types';
+import { useWakeLock } from '@/lib/wakelock';
 
 type Chosen = Pick & { kind: Kind; lot_id: string | null };
 
@@ -64,6 +65,7 @@ function lotLabel(lot: Lot): string {
 }
 
 function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
+  useWakeLock();
   const toast = useToast();
   const batchUrl = `/api/batches/${batch.id}`;
   const catalog = useQuery<CatalogItem[]>('/api/catalog').data ?? [];

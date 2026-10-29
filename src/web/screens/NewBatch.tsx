@@ -3,9 +3,8 @@
 // leaving the weighing flow later loses nothing.
 import { Minus, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { Chip, Chips } from '@/components/Chip';
+import { ColorChips } from '@/components/ColorChips';
 import { DatePick } from '@/components/DatePick';
-import { ColorDot } from '@/components/Labels';
 import { ActionRow, Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
@@ -15,10 +14,10 @@ import { t } from '@/lib/i18n';
 import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import type { BatchSummary } from '@/lib/types';
-
-const COLORS = ['red', 'orange', 'yellow', 'green', 'brown', 'purple'] as const;
+import { useWakeLock } from '@/lib/wakelock';
 
 export function NewBatch() {
+  useWakeLock();
   const toast = useToast();
   const { data: batches } = useQuery<BatchSummary[]>('/api/batches');
   const next = (batches ?? []).reduce((max, b) => Math.max(max, b.number), 0) + 1;
@@ -79,19 +78,7 @@ export function NewBatch() {
         </div>
         <div>
           <h2 className="mb-2 text-lg text-muted-foreground">{t('new.color')}</h2>
-          <Chips>
-            <Chip selected={color === null} onClick={() => setColor(null)}>
-              {t('new.noColor')}
-            </Chip>
-            {COLORS.map((c) => (
-              <Chip key={c} selected={color === c} onClick={() => setColor(c)}>
-                <span className="flex items-center gap-2">
-                  <ColorDot color={c} />
-                  {t(`color.${c}`)}
-                </span>
-              </Chip>
-            ))}
-          </Chips>
+          <ColorChips value={color} onChange={setColor} />
         </div>
       </section>
     </Screen>
