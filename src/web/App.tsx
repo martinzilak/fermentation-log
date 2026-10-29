@@ -1,0 +1,71 @@
+import { useEffect } from 'react';
+import { Screen } from '@/components/Screen';
+import { ToastProvider } from '@/components/Toast';
+import { Button } from '@/components/ui/button';
+import { api, useReachable } from '@/lib/api';
+import { t } from '@/lib/i18n';
+import { invalidate } from '@/lib/query';
+import { matchPath, navigate, usePath } from '@/lib/router';
+import { AddStep } from '@/screens/AddStep';
+import { BatchDetail } from '@/screens/BatchDetail';
+import { BatchList } from '@/screens/BatchList';
+import { NewBatch } from '@/screens/NewBatch';
+import { NoteEvent } from '@/screens/NoteEvent';
+import { PhEvent } from '@/screens/PhEvent';
+import { Weighing } from '@/screens/Weighing';
+import type { ReactNode } from 'react';
+
+const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
+  ['/', () => <BatchList />],
+  ['/new', () => <NewBatch />],
+  ['/b/:id', (p) => <BatchDetail id={p.id!} />],
+  ['/b/:id/s/:stepId', (p) => <Weighing batchId={p.id!} stepId={p.stepId!} />],
+  ['/b/:id/add-step', (p) => <AddStep batchId={p.id!} />],
+  ['/b/:id/note', (p) => <NoteEvent batchId={p.id!} />],
+  ['/b/:id/ph', (p) => <PhEvent batchId={p.id!} />],
+];
+
+function route(path: string): ReactNode {
+  for (const [pattern, render] of ROUTES) {
+    const params = matchPath(pattern, path);
+    if (params) return render(params);
+  }
+  return (
+    <Screen title={t('app.notFound')} footer={<Button onClick={() => navigate('/', { replace: true })}>{t('detail.batches')}</Button>} />
+  );
+}
+
+const ping = () => api.get('/api/me').then(() => invalidate('/api/'), () => {});
+
+/** SPEC §8.5: a large banner when the server can't be reached. */
+function OfflineBanner() {
+  const reachable = useReachable();
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === 'visible' && void ping();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  if (reachable) return null;
+  return (
+    <div
+      role="alert"
+      className="sticky top-0 z-40 flex items-center gap-3 bg-warn px-4 pb-3 text-lg font-semibold text-black"
+      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+    >
+      <p className="flex-1">{t('app.offline')}</p>
+      <Button variant="outline" className="border-black/40 bg-transparent text-black" onClick={() => void ping()}>
+        {t('app.retry')}
+      </Button>
+    </div>
+  );
+}
+
+export function App() {
+  const path = usePath();
+  return (
+    <ToastProvider>
+      <OfflineBanner />
+      {route(path)}
+    </ToastProvider>
+  );
+}
