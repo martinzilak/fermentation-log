@@ -615,3 +615,12 @@ Where this section conflicts with an earlier one, this section wins.
   - Typing a new name in weighing mode creates the entry.
   - When a name is entered through an alias, the original text goes in the line's `note`, as in §6.2.
   - The catalog screen can rename an entry, change its kind, edit its aliases, merge two entries and delete unused ones. When two entries are merged, the lines move to the one kept and the other's name becomes an alias.
+
+### 15.4 Details settled while building M2b
+
+- **API additions to §11:**
+  - `POST /api/batches/:id/restore` undoes a delete. It answers 409 if a live batch has taken the number since.
+  - Ingredient lines take `variety_id`. On POST and PATCH the server resolves the entry: the ids sent win, a lot sets the variety, and otherwise the name finds an entry or creates one. The line then takes the entry's name and kind.
+  - Varieties take `aliases`. A name or alias can belong to only one entry (ignoring case and accents); a clash answers 409. Catalog items can't have the kind `pepper`.
+  - Renaming an entry, or changing a catalog item's kind, updates its lines.
+- **Alias notes.** Weighing mode still writes "recorded as '…'" in the note when a name is picked through an alias. The importer doesn't, because the seed files keep the original names.
