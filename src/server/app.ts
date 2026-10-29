@@ -6,6 +6,7 @@ import type { Config } from './config.ts';
 import type { DB } from './db.ts';
 import { ApiError, type AppContext } from './http.ts';
 import { batchRoutes } from './routes/batches.ts';
+import { referenceRoutes } from './routes/reference.ts';
 
 const defaultPeer: PeerResolver = (c) => getConnInfo(c).remote.address;
 
@@ -66,6 +67,7 @@ export function createApp({ config, db, mediaDir, getPeer = defaultPeer, now = (
 
   app.get('/api/me', (c) => c.json(c.get('user')));
   app.route('/api', batchRoutes(ctx));
+  app.route('/api', referenceRoutes(ctx));
 
   app.get('/', (c) => {
     const { login, name } = c.get('user');
