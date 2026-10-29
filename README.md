@@ -134,6 +134,23 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - **403 "only reachable through Tailscale Serve":** the request didn't come from Serve. Someone probably added a port mapping or changed `BIND_HOST`. Remove it.
 - **"Can't reach the server":** Tailscale is off on the device.
 
+## Importing batch files
+
+Batch files are Markdown with YAML frontmatter (SPEC §10.1). `seed/` holds the four historical batches; the image includes it.
+
+```sh
+npm run import -- seed                # local, into ./data
+npm run import -- --force seed/batch-002.md
+```
+
+On the NAS, in the Unraid web terminal:
+
+```sh
+docker exec -u 99:100 ferment-log node dist/server/cli/import.js seed
+```
+
+`-u 99:100` runs the import as the app's user, so the database files don't end up owned by root. A batch number that already exists is skipped; `--force` replaces it. `--author <login>` sets the author (default `import`). Each run snapshots the database to `backups/ferment-preimport-*.db` first (last 5 kept) and exits non-zero if any file failed.
+
 ## Data, backups and restore
 
 Everything lives in `/data`, which is `/mnt/user/appdata/ferment-log/` on the host:
@@ -144,6 +161,7 @@ Everything lives in `/data`, which is `/mnt/user/appdata/ferment-log/` on the ho
 | `media/` | photos and voice notes |
 | `exports/` | nightly Markdown + JSON export (M3) |
 | `backups/ferment-startup-*.db` | `VACUUM INTO` snapshot taken on every container start, before migrations (last 10 kept) |
+| `backups/ferment-preimport-*.db` | snapshot taken before each import run (last 5 kept) |
 | `backups/ferment-YYYYMMDD.db` | nightly snapshot (M3, last 14 kept) |
 
 Every deploy restarts the container, so it always has a fresh pre-migration snapshot. The Appdata Backup plugin can copy `backups/`, which holds consistent files, unlike the live `ferment.db` with its WAL.

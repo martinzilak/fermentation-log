@@ -21,6 +21,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY migrations ./migrations
+COPY seed ./seed
 COPY ferment-entrypoint.sh /usr/local/bin/ferment-entrypoint.sh
 VOLUME /data
 # No EXPOSE: the app is reached only through Tailscale Serve inside the container.

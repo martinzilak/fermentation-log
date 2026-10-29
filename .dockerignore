@@ -3,6 +3,5 @@ dist
 data
 .git
 .DS_Store
-seed
 *.md
 !README.md
