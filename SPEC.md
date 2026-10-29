@@ -623,4 +623,10 @@ Where this section conflicts with an earlier one, this section wins.
   - Ingredient lines take `variety_id`. On POST and PATCH the server resolves the entry: the ids sent win, a lot sets the variety, and otherwise the name finds an entry or creates one. The line then takes the entry's name and kind.
   - Varieties take `aliases`. A name or alias can belong to only one entry (ignoring case and accents); a clash answers 409. Catalog items can't have the kind `pepper`.
   - Renaming an entry, or changing a catalog item's kind, updates its lines.
+- **More API additions to §11:**
+  - `POST /api/catalog/:id/merge` and `POST /api/varieties/:id/merge` take `{ into }`. The lines (and a variety's lots) move to `into`, the merged entry's names become aliases, and it is deleted. A variety without SHU takes the merged one's.
+  - `DELETE` on catalog items, varieties, lots and bottle types answers 409 while anything uses them. Their lists carry a `uses` count.
+  - Moving a lot to another variety moves its lines with it.
+- **Merging has no Undo.** It's the one edit that can't be taken back with a tap. The edit screen asks for the entry to keep and then a separate "Merge into …" tap.
+- **Bottling photos** are ordinary `photo` events taken during the checklist; the `bottled` event itself has no attachments.
 - **Alias notes.** Weighing mode still writes "recorded as '…'" in the note when a name is picked through an alias. The importer doesn't, because the seed files keep the original names.
