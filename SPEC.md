@@ -526,7 +526,7 @@ All `POST` routes accept the client-generated `id` and are idempotent: a repeate
 
 **M2b — Rest of the kitchen UX**
 - Remaining screens from §8.2 (bottling checklist, edit, varieties and lots, catalog, bottle types). No vessels screen; see §15.
-- The §15 changes: soft-deleted batches, no saved crocks, one-off bottles at bottling.
+- The §15 changes: soft-deleted batches, no saved crocks, one-off bottles at bottling, English names and normalized ingredients.
 - Every §8.1 requirement is met. Do a checklist review against it, and test on a real iPhone with wet fingers or gloves.
 - Voice notes, wake lock and the bottling checklist's required fields.
 
@@ -592,3 +592,26 @@ Where this section conflicts with an earlier one, this section wins.
 - Bottle types (name, volume) stay for bottles used regularly, and they appear as chips in the bottling checklist.
 - A fill row can instead be a one-off bottle: volume in ml, count and an optional label. It doesn't create a bottle type.
 - `bottled` fills become `{ bottle_type_id, count }` or `{ volume_ml, count, label? }`. Bottled volume (§7.2) sums both kinds.
+
+### 15.3 From the first M2a test
+
+**Settled**
+- **One scroller per screen.** The page itself scrolls, with the title and the actions pinned. There are no scroll areas inside scroll areas.
+- **Ingredient chips.**
+  - Before anything is typed, up to 8 chips show: the names this step type usually takes come first, then the most recent.
+  - A search shows up to 12, and it matches the name, the aliases and the kind ("salt" finds Soľ).
+  - Matching ignores case and accents, so an existing name is never entered a second time. A new name gets single spaces and a capital first letter.
+- **No nicknames in the UI.** `local_name` and a variety's `local_names` stay in the data for imported batches but aren't shown or asked for.
+
+**For M2b**
+- **English everywhere.** The UI and the data are English, so ingredient and variety names are English (Water, Salt, Garlic).
+  - The Slovak names become aliases, so typing "soľ" still finds Salt.
+  - A migration converts the existing data once.
+  - The `seed/` files stay as the original Slovak record; the importer maps their names through the aliases.
+- **Normalized ingredients.** Every ingredient line refers to one entry:
+  - A non-pepper line refers to a catalog item (name, kind, aliases).
+  - A pepper line refers to a variety through a new `variety_id` on the line. The lot stays optional, and when one is given it must belong to that variety.
+  - The line's `name` is a copy of the entry's name, and it is updated when the entry is renamed.
+  - Typing a new name in weighing mode creates the entry.
+  - When a name is entered through an alias, the original text goes in the line's `note`, as in §6.2.
+  - The catalog screen can rename an entry, change its kind, edit its aliases, merge two entries and delete unused ones. When two entries are merged, the lines move to the one kept and the other's name becomes an alias.
