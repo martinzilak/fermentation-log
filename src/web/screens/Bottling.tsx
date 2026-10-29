@@ -198,9 +198,9 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
           }
         >
           {draft.fills.length > 0 && (
-            <ul className="mb-4 divide-y rounded-xl border bg-card">
+            <ul className="mb-4 flex flex-col gap-3">
               {draft.fills.map((f, i) => (
-                <li key={i} className="flex items-center gap-3 py-1 pr-1 pl-4 text-lg">
+                <li key={i} className="flex items-center gap-3 rounded-xl border bg-card py-1 pr-1 pl-4 text-lg">
                   <span className="flex-1">{t('detail.fills', { count: f.count, bottle: fillName(f, bottleTypes) })}</span>
                   <Button
                     variant="ghost"

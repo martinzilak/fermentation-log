@@ -138,7 +138,7 @@ export function LinkRow({ title, hint, onClick }: { title: ReactNode; hint?: Rea
     <button
       type="button"
       onClick={() => acceptPress() && onClick()}
-      className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left active:bg-accent"
+      className="flex min-h-16 w-full items-center gap-3 rounded-xl border bg-card px-4 py-2 text-left active:bg-accent"
     >
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-lg font-medium">{title}</span>
@@ -149,6 +149,7 @@ export function LinkRow({ title, hint, onClick }: { title: ReactNode; hint?: Rea
   );
 }
 
+/** Rows stay 12 px apart, so a wet finger can't land between two (SPEC §8.1 item 1). */
 export function RowList({ children }: { children: ReactNode }) {
-  return <div className="divide-y overflow-hidden rounded-xl border bg-card">{children}</div>;
+  return <div className="flex flex-col gap-3">{children}</div>;
 }
