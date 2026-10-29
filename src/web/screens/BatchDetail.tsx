@@ -7,7 +7,7 @@ import { ActionRow, Screen } from '@/components/Screen';
 import { errorMessage, useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
 import { api, HttpError, OfflineError } from '@/lib/api';
-import { formatDay, formatStamp } from '@/lib/format';
+import { dayNumber, formatDay, formatStamp } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { uploadPhoto } from '@/lib/photo';
@@ -117,7 +117,7 @@ export function BatchDetail({ id }: { id: string }) {
       <section className="grid grid-cols-2 gap-3">
         <Stat label={t('detail.salt')}>{d.salt_pct === null ? '—' : formatPct(d.salt_pct)}</Stat>
         {fermenting && d.ferment_day !== null ? (
-          <Stat label={t('detail.day')}>{d.ferment_day}</Stat>
+          <Stat label={t('detail.day')}>{dayNumber(d.ferment_day)}</Stat>
         ) : (
           d.ferment_days !== null && <Stat label={t('detail.fermentDays')}>{t('detail.days', { n: d.ferment_days })}</Stat>
         )}

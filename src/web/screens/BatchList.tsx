@@ -2,6 +2,7 @@
 import { ColorDot, StatusBadge } from '@/components/Labels';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/ui/button';
+import { dayNumber } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { acceptPress } from '@/lib/press';
 import { useQuery } from '@/lib/query';
@@ -35,7 +36,7 @@ export function BatchList() {
               <span className="flex min-w-0 flex-1 flex-col">
                 {b.name && <span className="truncate text-lg font-medium">{b.name}</span>}
                 {b.ferment_day !== null && (
-                  <span className="text-lg text-muted-foreground">{t('list.day', { n: b.ferment_day })}</span>
+                  <span className="text-lg text-muted-foreground">{t('list.day', { n: dayNumber(b.ferment_day) })}</span>
                 )}
               </span>
               <StatusBadge status={b.status} />
