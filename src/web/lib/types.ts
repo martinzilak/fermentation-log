@@ -136,3 +136,8 @@ export interface RecentLine {
 export interface Settings {
   target_salt_pct: number;
 }
+
+export interface ExportStatus {
+  last_export_at: string | null;
+  last_backup_on: string | null;
+}

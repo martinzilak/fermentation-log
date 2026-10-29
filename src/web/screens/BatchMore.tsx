@@ -1,5 +1,6 @@
 // The batch detail's More (SPEC §8.2 item 3): the less frequent events
-// (weigh, burp, issue, tasting), bottling and the edit screen.
+// (weigh, burp, issue, tasting), bottling, the edit screen and the export of
+// this one batch.
 import { useState } from 'react';
 import { ISSUE_KINDS } from '../../shared/schemas.ts';
 import { Chip, Chips } from '@/components/Chip';
@@ -68,6 +69,11 @@ export function BatchMore({ id }: { id: string }) {
         )}
         <Button variant="outline" className={`${big} col-span-2`} onClick={() => navigate(`/b/${id}/edit`, { replace: true })}>
           {t('batchEdit.open')}
+        </Button>
+        <Button asChild variant="outline" className={`${big} col-span-2`}>
+          <a href={`/api/batches/${id}/export.md`} download>
+            {t('export.batch')}
+          </a>
         </Button>
       </div>
     </Screen>

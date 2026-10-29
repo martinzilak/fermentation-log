@@ -13,7 +13,7 @@ import { BatchMore, IssueEvent, TastingEvent, WeighEvent } from '@/screens/Batch
 import { Bottling } from '@/screens/Bottling';
 import { BatchEdit, LineEdit, StepEdit } from '@/screens/EditBatch';
 import { EntryEditor, EntryList, LotEditor } from '@/screens/Entries';
-import { BottleTypeEditor, BottleTypeList, MoreMenu, SettingsScreen } from '@/screens/Kitchen';
+import { BottleTypeEditor, BottleTypeList, ExportScreen, MoreMenu, SettingsScreen } from '@/screens/Kitchen';
 import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
@@ -45,6 +45,7 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/lots/:id', (p) => <LotEditor id={p.id!} />],
   ['/bottle-types', () => <BottleTypeList />],
   ['/bottle-types/:id', (p) => <BottleTypeEditor id={p.id!} />],
+  ['/export', () => <ExportScreen />],
   ['/settings', () => <SettingsScreen />],
   ['/ph-info', () => <PhInfo />],
 ];

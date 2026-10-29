@@ -1,5 +1,5 @@
 // The "More" menu from the batch list, with the small reference screens:
-// bottle types (SPEC §8.2 item 8, §15.2) and settings (item 10).
+// bottle types (SPEC §8.2 item 8, §15.2), export (item 9) and settings (item 10).
 import { useState } from 'react';
 import { LinkRow, NumberField, RowList, Section, TextField, usePatch } from '@/components/Edit';
 import { Screen } from '@/components/Screen';
@@ -7,11 +7,12 @@ import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { formatDay, formatStamp } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
-import type { BottleType, Settings } from '@/lib/types';
+import type { BottleType, ExportStatus, Settings } from '@/lib/types';
 
 const BackButton = ({ to }: { to: string }) => (
   <Button variant="outline" onClick={() => goBack(to)}>
@@ -27,12 +28,39 @@ export function MoreMenu() {
         <LinkRow title={t('catalog.title')} hint={t('more.catalogHint')} onClick={() => navigate('/catalog')} />
         <LinkRow title={t('varieties.title')} hint={t('more.varietiesHint')} onClick={() => navigate('/varieties')} />
         <LinkRow title={t('bottles.title')} hint={t('more.bottlesHint')} onClick={() => navigate('/bottle-types')} />
+        <LinkRow title={t('export.title')} hint={t('more.exportHint')} onClick={() => navigate('/export')} />
         <LinkRow
           title={t('settings.title')}
           hint={settings ? t('settings.saltHint', { pct: formatPct(settings.target_salt_pct) }) : undefined}
           onClick={() => navigate('/settings')}
         />
       </RowList>
+    </Screen>
+  );
+}
+
+export function ExportScreen() {
+  const status = useQuery<ExportStatus>('/api/export/status').data;
+  return (
+    <Screen title={t('export.title')} footer={<BackButton to="/more" />}>
+      <Section>
+        <Button asChild size="lg" className="h-16 w-full">
+          <a href="/api/export.zip" download>
+            {t('export.all')}
+          </a>
+        </Button>
+        <p className="mt-2 text-base text-muted-foreground">{t('export.allHint')}</p>
+      </Section>
+      {status && (
+        <Section title={t('export.nightly')}>
+          <p className="text-lg">
+            {status.last_export_at ? t('export.lastExport', { when: formatStamp(status.last_export_at) }) : t('export.noExport')}
+          </p>
+          <p className="mt-1 text-lg">
+            {status.last_backup_on ? t('export.lastBackup', { day: formatDay(status.last_backup_on) }) : t('export.noBackup')}
+          </p>
+        </Section>
+      )}
     </Screen>
   );
 }
