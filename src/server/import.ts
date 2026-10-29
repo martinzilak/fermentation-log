@@ -49,6 +49,7 @@ const StepEntry = v.object({
     }),
     {},
   ),
+  note: v.optional(v.nullable(v.string())),
   add: v.optional(v.array(AddEntry), []),
 });
 
@@ -63,7 +64,19 @@ export const Frontmatter = v.object({
   output: v.optional(
     v.object({
       ph: v.optional(v.nullable(Num)),
-      fills: v.optional(v.array(v.object({ bottle: v.string(), ml: Num, count: v.pipe(v.number(), v.integer()) })), []),
+      ph_not_measured_reason: v.optional(v.nullable(v.string())),
+      // A named bottle is a bottle type; without one it is a one-off fill (SPEC §15.2).
+      fills: v.optional(
+        v.array(
+          v.object({
+            bottle: v.optional(v.string()),
+            label: v.optional(v.nullable(v.string())),
+            ml: Num,
+            count: v.pipe(v.number(), v.integer()),
+          }),
+        ),
+        [],
+      ),
       leftover_g: v.optional(v.nullable(Num)),
       total_g: v.optional(v.nullable(Num)),
     }),
@@ -153,7 +166,16 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
       insert(
         db,
         'steps',
-        { id: stepId, batch_id: batchId, position: step.position, type: step.type, date: step.date, params: params.output, ...meta },
+        {
+          id: stepId,
+          batch_id: batchId,
+          position: step.position,
+          type: step.type,
+          date: step.date,
+          params: params.output,
+          note: step.note ?? null,
+          ...meta,
+        },
         STEP_COLS,
       );
       step.add.forEach((add, position) => {
@@ -173,10 +195,11 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
 
     if (fm.bottled) {
       const out = fm.output;
-      const fills = (out?.fills ?? []).map((f) => ({
-        bottle_type_id: findOrCreate('bottle_types', f.bottle, { volume_ml: f.ml }),
-        count: f.count,
-      }));
+      const fills = (out?.fills ?? []).map((f) =>
+        f.bottle
+          ? { bottle_type_id: findOrCreate('bottle_types', f.bottle, { volume_ml: f.ml }), count: f.count }
+          : { volume_ml: f.ml, count: f.count, ...(f.label ? { label: f.label } : {}) },
+      );
       insert(
         db,
         'events',
@@ -189,6 +212,7 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
           payload: {
             fills,
             ph: out?.ph ?? null,
+            ...(out?.ph_not_measured_reason ? { ph_not_measured_reason: out.ph_not_measured_reason } : {}),
             ...(out?.leftover_g != null ? { leftover_g: out.leftover_g } : {}),
             ...(out?.total_g != null ? { total_g: out.total_g } : {}),
           },
