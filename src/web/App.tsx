@@ -9,6 +9,8 @@ import { matchPath, navigate, usePath } from '@/lib/router';
 import { AddStep } from '@/screens/AddStep';
 import { BatchDetail } from '@/screens/BatchDetail';
 import { BatchList } from '@/screens/BatchList';
+import { EntryEditor, EntryList, LotEditor } from '@/screens/Entries';
+import { BottleTypeEditor, BottleTypeList, MoreMenu, SettingsScreen } from '@/screens/Kitchen';
 import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
@@ -23,6 +25,15 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/b/:id/add-step', (p) => <AddStep batchId={p.id!} />],
   ['/b/:id/note', (p) => <NoteEvent batchId={p.id!} />],
   ['/b/:id/ph', (p) => <PhEvent batchId={p.id!} />],
+  ['/more', () => <MoreMenu />],
+  ['/catalog', () => <EntryList path="catalog" />],
+  ['/catalog/:id', (p) => <EntryEditor key={p.id} path="catalog" id={p.id!} />],
+  ['/varieties', () => <EntryList path="varieties" />],
+  ['/varieties/:id', (p) => <EntryEditor key={p.id} path="varieties" id={p.id!} />],
+  ['/lots/:id', (p) => <LotEditor id={p.id!} />],
+  ['/bottle-types', () => <BottleTypeList />],
+  ['/bottle-types/:id', (p) => <BottleTypeEditor id={p.id!} />],
+  ['/settings', () => <SettingsScreen />],
 ];
 
 function route(path: string): ReactNode {

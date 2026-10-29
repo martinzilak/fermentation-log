@@ -80,6 +80,9 @@ export interface Variety {
   local_names: string[];
   shu_min: number | null;
   shu_max: number | null;
+  shu_source?: string | null;
+  notes?: string | null;
+  uses?: number;
 }
 
 export interface Lot {
@@ -90,6 +93,8 @@ export interface Lot {
   propagation: 'seed' | 'sapling' | null;
   supplier: string | null;
   acquired_on: string | null;
+  notes?: string | null;
+  uses?: number;
 }
 
 export interface CatalogItem {
@@ -97,6 +102,8 @@ export interface CatalogItem {
   name: string;
   kind: Kind;
   aliases: string[];
+  notes?: string | null;
+  uses?: number;
 }
 
 export interface Vessel {
@@ -108,7 +115,11 @@ export interface BottleType {
   id: string;
   name: string;
   volume_ml: number;
+  notes?: string | null;
+  uses?: number;
 }
+
+export type Fill = { bottle_type_id: string; count: number } | { volume_ml: number; count: number; label?: string | null };
 
 export interface RecentLine {
   name: string;

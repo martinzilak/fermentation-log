@@ -16,9 +16,14 @@ export function BatchList() {
     <Screen
       title={t('list.title')}
       footer={
-        <Button size="lg" onClick={() => navigate('/new')}>
-          {t('list.new')}
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" className="h-16 px-6" onClick={() => navigate('/more')}>
+            {t('list.more')}
+          </Button>
+          <Button size="lg" className="flex-1" onClick={() => navigate('/new')}>
+            {t('list.new')}
+          </Button>
+        </div>
       }
     >
       {loading && <p className="text-muted-foreground">{t('common.loading')}</p>}
