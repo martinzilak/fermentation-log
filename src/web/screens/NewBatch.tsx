@@ -49,7 +49,6 @@ export function NewBatch() {
   return (
     <Screen
       title={t('new.title')}
-      fixed
       footer={
         <>
           <Button size="lg" disabled={!batches} onClick={() => void start()}>

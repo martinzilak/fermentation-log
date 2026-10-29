@@ -36,7 +36,6 @@ export function AddStep({ batchId }: { batchId: string }) {
   return (
     <Screen
       title={t('step.title')}
-      fixed
       footer={
         <Button variant="outline" onClick={() => goBack(detail)}>
           {t('common.back')}

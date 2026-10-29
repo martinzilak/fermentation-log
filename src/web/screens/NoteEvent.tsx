@@ -38,7 +38,6 @@ export function NoteEvent({ batchId }: { batchId: string }) {
   return (
     <Screen
       title={t('note.title')}
-      fixed
       footer={
         <ActionRow>
           <Button variant="outline" className="h-16" onClick={() => goBack(detail)}>

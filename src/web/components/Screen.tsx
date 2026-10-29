@@ -1,34 +1,32 @@
-// Screen layout: a title at the top, content in the middle, and every action
-// in a footer pinned to the bottom (thumb zone, SPEC §8.1 item 2), with the
-// Undo toast just above the actions. Safe-area insets keep standalone mode
-// clear of the notch and the home indicator.
+// Screen layout with a single scroller, the page itself: the title sticks to
+// the top and every action to the bottom (thumb zone, SPEC §8.1 item 2), and
+// content scrolls between them. No inner scroll area, so a scroll gesture
+// never has to pick between two. The Undo toast sits just above the actions,
+// and safe-area insets keep standalone mode clear of the notch and home bar.
 import type { ReactNode } from 'react';
 import { ToastSlot } from '@/components/Toast';
-import { cn } from '@/lib/utils';
 
 interface Props {
   title: ReactNode;
   subtitle?: ReactNode;
   children?: ReactNode;
   footer: ReactNode;
-  /** Flow screens fill the viewport without scrolling (SPEC §8.1 item 7). */
-  fixed?: boolean;
 }
 
 const sides = { paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' };
 
-export function Screen({ title, subtitle, children, footer, fixed = false }: Props) {
+export function Screen({ title, subtitle, children, footer }: Props) {
   return (
-    <div className={cn('flex flex-col', fixed ? 'h-dvh overflow-hidden' : 'min-h-dvh')}>
-      <header className="pb-2" style={{ ...sides, paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-10 bg-background pb-2" style={{ ...sides, paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         <h1 className="text-2xl leading-tight font-bold">{title}</h1>
         {subtitle && <div className="mt-1 text-lg text-muted-foreground">{subtitle}</div>}
       </header>
-      <main className={cn('flex-1 pb-4', fixed && 'min-h-0 overflow-y-auto')} style={sides}>
+      <main className="flex-1 pb-4" style={sides}>
         {children}
       </main>
       <footer
-        className="sticky bottom-0 flex flex-col gap-3 border-t bg-background pt-3"
+        className="sticky bottom-0 z-10 flex flex-col gap-3 border-t bg-background pt-3"
         style={{ ...sides, paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <ToastSlot />

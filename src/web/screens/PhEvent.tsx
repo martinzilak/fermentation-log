@@ -46,7 +46,6 @@ export function PhEvent({ batchId }: { batchId: string }) {
   return (
     <Screen
       title={t('ph.title')}
-      fixed
       footer={
         <NumpadFooter
           value={value}
