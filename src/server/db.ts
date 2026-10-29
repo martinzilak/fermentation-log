@@ -1,0 +1,70 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
+
+export type DB = Database.Database;
+
+// Resolves to <repo>/migrations from both src/server (tsx) and dist/server (built).
+export const MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
+
+export function openDb(file: string): DB {
+  const db = new Database(file);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+  return db;
+}
+
+interface Migration {
+  version: number;
+  name: string;
+  sql: string;
+}
+
+export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
+  const migrations = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .map((f) => {
+      const match = /^(\d+)_.+\.sql$/.exec(f);
+      if (!match) throw new Error(`Bad migration file name: ${f} (expected NNNN_name.sql)`);
+      return { version: Number(match[1]), name: f, sql: fs.readFileSync(path.join(dir, f), 'utf8') };
+    })
+    .sort((a, b) => a.version - b.version);
+
+  for (let i = 1; i < migrations.length; i++) {
+    if (migrations[i]!.version === migrations[i - 1]!.version) {
+      throw new Error(`Duplicate migration version ${migrations[i]!.version}`);
+    }
+  }
+  return migrations;
+}
+
+export function pendingMigrations(db: DB, migrations: Migration[] = readMigrations()): Migration[] {
+  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    applied_at TEXT NOT NULL
+  )`);
+  const applied = new Set(
+    db
+      .prepare('SELECT version FROM schema_migrations')
+      .pluck()
+      .all() as number[],
+  );
+  return migrations.filter((m) => !applied.has(m.version));
+}
+
+/** Applies pending migrations, each in its own transaction. Returns the names applied. */
+export function migrate(db: DB, migrations: Migration[] = readMigrations()): string[] {
+  const pending = pendingMigrations(db, migrations);
+  const record = db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)');
+  for (const m of pending) {
+    db.transaction(() => {
+      db.exec(m.sql);
+      record.run(m.version, m.name, new Date().toISOString());
+    })();
+  }
+  return pending.map((m) => m.name);
+}
