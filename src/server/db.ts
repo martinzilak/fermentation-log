@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { DATA_MIGRATIONS } from './data-migrations.ts';
 
 export type DB = Database.Database;
 
@@ -16,20 +17,25 @@ export function openDb(file: string): DB {
   return db;
 }
 
-interface Migration {
+export interface Migration {
   version: number;
   name: string;
   sql: string;
+  /** Runs after the SQL, in the same transaction, for changes SQL can't express. */
+  data?: (db: DB) => void;
 }
 
-export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
+export type DataMigrations = Record<number, (db: DB) => void>;
+
+export function readMigrations(dir: string = MIGRATIONS_DIR, data: DataMigrations = DATA_MIGRATIONS): Migration[] {
   const migrations = fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.sql'))
     .map((f) => {
       const match = /^(\d+)_.+\.sql$/.exec(f);
       if (!match) throw new Error(`Bad migration file name: ${f} (expected NNNN_name.sql)`);
-      return { version: Number(match[1]), name: f, sql: fs.readFileSync(path.join(dir, f), 'utf8') };
+      const version = Number(match[1]);
+      return { version, name: f, sql: fs.readFileSync(path.join(dir, f), 'utf8'), ...(data[version] ? { data: data[version] } : {}) };
     })
     .sort((a, b) => a.version - b.version);
 
@@ -37,6 +43,9 @@ export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
     if (migrations[i]!.version === migrations[i - 1]!.version) {
       throw new Error(`Duplicate migration version ${migrations[i]!.version}`);
     }
+  }
+  for (const version of Object.keys(data)) {
+    if (!migrations.some((m) => m.version === Number(version))) throw new Error(`Data migration ${version} has no .sql file`);
   }
   return migrations;
 }
@@ -74,6 +83,7 @@ export function migrate(db: DB, migrations: Migration[] = readMigrations()): str
     for (const m of pending) {
       db.transaction(() => {
         db.exec(m.sql);
+        m.data?.(db);
         const broken = db.pragma('foreign_key_check') as { table: string }[];
         if (broken.length) {
           throw new Error(`${m.name} leaves ${broken.length} broken reference(s), first in ${broken[0]!.table}`);

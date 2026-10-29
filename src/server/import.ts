@@ -1,6 +1,7 @@
 // Imports batch files (SPEC §10.1, §10.3): Markdown with YAML frontmatter.
 // Creates batches, steps, lines, varieties, lots, vessels and bottle types as
-// needed and resolves catalog aliases. Idempotent by batch number.
+// needed. Ingredient names resolve through the aliases, so the Slovak seed
+// files land on the English entries (SPEC §15.3). Idempotent by batch number.
 import { randomUUID } from 'node:crypto';
 import * as v from 'valibot';
 import { parse as parseYaml } from 'yaml';
@@ -8,6 +9,7 @@ import { BATCH_STATUSES, IsoDate, KINDS, ORIGINS, PROPAGATIONS, STEP_TYPES, pars
 import { autoStatus } from '../shared/status.ts';
 import { BATCH_COLS, EVENT_COLS, STEP_COLS } from './batch-view.ts';
 import type { DB } from './db.ts';
+import { findOrCreateEntry } from './entries.ts';
 import { formatIssues } from './http.ts';
 import { insert, update, type Row } from './store.ts';
 
@@ -100,6 +102,7 @@ export type ImportResult = { number: number; result: 'imported' | 'replaced' | '
 export function importBatchFile(db: DB, text: string, opts: ImportOptions): ImportResult {
   const { frontmatter: fm, body } = parseBatchFile(text);
   const meta = { created_at: opts.now, updated_at: opts.now, author: opts.author };
+  const audit = { now: opts.now, author: opts.author };
 
   const existing = db.prepare('SELECT id FROM batches WHERE number = ? AND deleted_at IS NULL').pluck().get(fm.batch) as string | undefined;
   if (existing && !opts.force) return { number: fm.batch, result: 'skipped', id: existing };
@@ -111,10 +114,6 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
     insert(db, table, { id: newId, name, ...extra, ...meta });
     return newId;
   };
-
-  const catalog = (
-    db.prepare('SELECT id, name, aliases FROM catalog_items').all() as { id: string; name: string; aliases: string }[]
-  ).map((c) => ({ ...c, aliases: (JSON.parse(c.aliases) as string[]).map((a) => a.toLowerCase()) }));
 
   const run = db.transaction((): ImportResult => {
     if (existing) db.prepare('DELETE FROM batches WHERE id = ?').run(existing);
@@ -204,28 +203,26 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
 
   type Add = v.InferOutput<typeof AddEntry>;
 
-  /** Catalog alias resolution for any line; variety, lot and SHU handling for peppers. */
+  /**
+   * The catalog item or variety a line refers to, plus the lot and SHU for a
+   * pepper. The file's own note is kept as written; an alias adds none, since
+   * the file is the original record of the name.
+   */
   function resolveIngredient(add: Add, stepDate: string | null): Row {
-    const lower = add.name.toLowerCase();
-    const item = catalog.find((c) => c.name.toLowerCase() === lower || c.aliases.includes(lower));
-    const viaAlias = item !== undefined && item.name.toLowerCase() !== lower;
-    const note = viaAlias ? [add.note, `recorded as '${add.name}'`].filter(Boolean).join('; ') : (add.note ?? null);
-    const name = item?.name ?? add.name;
     const [shuMin, shuMax] =
       add.shu === undefined ? [null, null] : Array.isArray(add.shu) ? add.shu : [add.shu, add.shu];
-    const line: Row = { name, kind: add.kind, catalog_id: item?.id ?? null, note };
+    const note = add.note ?? null;
 
     if (add.kind !== 'pepper') {
+      const item = findOrCreateEntry(db, 'catalog_items', add.name, add.kind, audit);
+      const line: Row = { name: item.name, kind: item.kind, catalog_id: item.id, note };
       return add.shu === undefined ? line : { ...line, shu_min: shuMin, shu_max: shuMax, shu_source: add.shu_source ?? null };
     }
 
-    const variety = (db.prepare('SELECT * FROM varieties WHERE name = ? COLLATE NOCASE').get(add.name) as Row | undefined) ?? null;
-    let varietyId = variety?.id as string | undefined;
-    if (!varietyId) {
-      varietyId = randomUUID();
-      insert(db, 'varieties', { id: varietyId, name: add.name, local_names: add.local ? [add.local] : [], ...meta }, { json: ['local_names'] });
-    } else if (add.local) {
-      const names = JSON.parse(variety!.local_names as string) as string[];
+    const variety = findOrCreateEntry(db, 'varieties', add.name, 'pepper', audit);
+    const varietyId = variety.id;
+    if (add.local) {
+      const names = JSON.parse(db.prepare('SELECT local_names FROM varieties WHERE id = ?').pluck().get(varietyId) as string) as string[];
       if (!names.includes(add.local)) {
         update(db, 'varieties', varietyId, { local_names: [...names, add.local], updated_at: opts.now }, { json: ['local_names'] });
       }
@@ -276,7 +273,10 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
     }
 
     return {
-      ...line,
+      name: variety.name,
+      kind: 'pepper',
+      variety_id: varietyId,
+      note,
       lot_id: lotId,
       ...(override ? { shu_min: shuMin, shu_max: shuMax, shu_source: add.shu_source ?? null } : {}),
     };

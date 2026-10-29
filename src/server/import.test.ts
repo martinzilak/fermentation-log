@@ -72,7 +72,7 @@ describe('seed import (SPEC §7.2 acceptance values)', () => {
   });
 
   it('lists batch 3 peppers without SHU in the heat estimate', () => {
-    expect(batch(3).derived.heat!.unknown).toEqual(['California červená', 'Palermo červená', 'Sweet Amy biela', 'Kápia červená']);
+    expect(batch(3).derived.heat!.unknown).toEqual(['California Red', 'Palermo Red', 'Sweet Amy White', 'Kapia Red']);
   });
 
   it('creates one lot per variety and source, reusing it across batches', () => {
@@ -85,9 +85,20 @@ describe('seed import (SPEC §7.2 acceptance values)', () => {
   });
 
   it('links the vinegar line to the catalog item', () => {
-    const vinegar = batch(4).steps[1]!.lines.find((l) => l.name === 'Ocot kvasný liehový 8 %')!;
+    const vinegar = batch(4).steps[1]!.lines.find((l) => l.name === 'Spirit vinegar 8 %')!;
     expect(vinegar.catalog_id).toBe('0cc364e2-813e-4b83-8b6d-41b8fb7d9272');
     expect(vinegar.note).toBe("recorded as 'ocot'");
+  });
+
+  it('maps the Slovak names to the English entries and links every line to one', () => {
+    expect(batch(1).steps[0]!.lines.map((l) => l.name)).toEqual(['Cayenne', 'Jalapeño Red', 'Garlic', 'Water', 'Salt']);
+    expect(db.prepare('SELECT COUNT(*) FROM ingredient_lines WHERE catalog_id IS NULL AND variety_id IS NULL').pluck().get()).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) FROM ingredient_lines WHERE name = 'Red onion'").pluck().get()).toBe(2);
+    const created = db.prepare("SELECT name, kind FROM catalog_items WHERE author = 'import' ORDER BY name").all();
+    expect(created).toEqual([
+      { name: 'Brine', kind: 'brine' },
+      { name: 'Mash', kind: 'mash' },
+    ]);
   });
 });
 
@@ -101,7 +112,7 @@ describe('import behaviour', () => {
     expect(db.prepare('SELECT COUNT(*) FROM pepper_lots').pluck().get()).toBe(13);
   });
 
-  it('resolves a bare alias to the canonical catalog name and keeps the original in the note', () => {
+  it('resolves a bare alias to the canonical catalog name', () => {
     const file = `---
 batch: 9
 status: fermenting
@@ -114,7 +125,7 @@ steps:
 `;
     importBatchFile(db, file, opts);
     const line = batch(9).steps[0]!.lines[0]!;
-    expect(line).toMatchObject({ name: 'Ocot kvasný liehový 8 %', note: "recorded as 'ocot'" });
+    expect(line).toMatchObject({ name: 'Spirit vinegar 8 %', catalog_id: '0cc364e2-813e-4b83-8b6d-41b8fb7d9272', note: null });
   });
 
   it('keeps a status that differs from the automatic one as a manual override', () => {

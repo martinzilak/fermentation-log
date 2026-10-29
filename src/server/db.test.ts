@@ -63,6 +63,36 @@ describe('migrate with foreign keys', () => {
   });
 });
 
+describe('migration 0004 (normalized ingredients)', () => {
+  it('translates the recorded entries and links every existing line to one', () => {
+    const db = openDb(':memory:');
+    migrate(db, readMigrations().filter((m) => m.version <= 3));
+    const audit = "'2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z', 'import'";
+    db.exec(`
+      INSERT INTO batches (id, number, created_at, updated_at, author) VALUES ('b', 1, ${audit});
+      INSERT INTO steps (id, batch_id, position, type, created_at, updated_at, author) VALUES ('s', 'b', 0, 'ferment', ${audit});
+      INSERT INTO varieties (id, name, created_at, updated_at, author) VALUES ('v', 'Jalapeno červené', ${audit});
+      INSERT INTO pepper_lots (id, variety_id, season, origin, created_at, updated_at, author) VALUES ('lot', 'v', 2024, 'bought', ${audit});
+      INSERT INTO ingredient_lines (id, batch_id, step_id, position, name, kind, lot_id, catalog_id, created_at, updated_at, author) VALUES
+        ('l1', 'b', 's', 0, 'Jalapeno červené', 'pepper', 'lot', NULL, ${audit}),
+        ('l2', 'b', 's', 1, 'Voda', 'water', NULL, NULL, ${audit}),
+        ('l3', 'b', 's', 2, 'soľ', 'salt', NULL, NULL, ${audit}),
+        ('l4', 'b', 's', 3, 'Ocot kvasný liehový 8 %', 'acid', NULL, '0cc364e2-813e-4b83-8b6d-41b8fb7d9272', ${audit}),
+        ('l5', 'b', 's', 4, 'Brine', 'brine', NULL, NULL, ${audit}),
+        ('l6', 'b', 's', 5, 'Habanero', 'pepper', NULL, NULL, ${audit});
+    `);
+    migrate(db);
+    const lines = db.prepare('SELECT name, kind, catalog_id IS NOT NULL AS item, variety_id FROM ingredient_lines ORDER BY position').all();
+    expect(lines.map((l: any) => l.name)).toEqual(['Jalapeño Red', 'Water', 'Salt', 'Spirit vinegar 8 %', 'Brine', 'Habanero']);
+    expect(lines.map((l: any) => Boolean(l.item) || l.variety_id !== null)).toEqual([true, true, true, true, true, true]);
+    expect((lines[0] as any).variety_id).toBe('v');
+    expect(db.prepare("SELECT aliases FROM varieties WHERE id = 'v'").pluck().get()).toBe('["Jalapeno červené"]');
+    expect(db.prepare("SELECT COUNT(*) FROM varieties WHERE name = 'Jalapeño Red'").pluck().get()).toBe(1);
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.close();
+  });
+});
+
 describe('snapshot', () => {
   it('writes a readable copy and keeps only the newest N', () => {
     const db = openDb(path.join(dir, 'ferment.db'));

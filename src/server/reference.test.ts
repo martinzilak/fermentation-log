@@ -32,9 +32,13 @@ describe('reference data and settings', () => {
     expect(list[0].notes).toBe('Glass, screw cap');
   });
 
-  it('ships the seeded vinegar with its alias', async () => {
-    const catalog = (await t.call('GET', '/api/catalog')).body;
-    expect(catalog[0]).toMatchObject({ name: 'Ocot kvasný liehový 8 %', kind: 'acid', aliases: ['ocot'] });
+  it('ships the English catalog with the Slovak names as aliases', async () => {
+    const catalog = (await t.call('GET', '/api/catalog')).body as { name: string; kind: string; aliases: string[] }[];
+    expect(catalog.find((c) => c.kind === 'acid' && c.aliases.includes('ocot'))).toMatchObject({
+      name: 'Spirit vinegar 8 %',
+      aliases: ['Ocot kvasný liehový 8 %', 'ocot'],
+    });
+    expect(catalog.find((c) => c.name === 'Salt')).toMatchObject({ kind: 'salt', aliases: ['Soľ'] });
   });
 
   it('refuses propagation for bought lots', async () => {
