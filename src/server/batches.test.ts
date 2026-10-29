@@ -84,6 +84,7 @@ describe('status transitions', () => {
     await addStep(batch.id, { type: 'ferment', date: '2026-10-01', params: { vessel_tare_g: 1669 } });
     expect(await status()).toBe('fermenting');
     const blend = await addStep(batch.id, { type: 'blend' });
+    t.setNow('2026-10-29T13:00:00.000Z');
     expect(await status()).toBe('fermenting');
     await t.call('PATCH', `/api/steps/${blend.id}`, { date: '2026-10-20' });
     expect(await status()).toBe('processing');
@@ -164,8 +165,13 @@ describe('recent ingredient names', () => {
     await add('Voda', 'water');
     t.setNow('2026-10-29T12:00:00.000Z');
     await add('cesnak', 'aromatic');
+    const blend = await addStep(batch.id, { type: 'blend' });
+    t.setNow('2026-10-29T13:00:00.000Z');
+    await t.call('POST', `/api/steps/${blend.id}/lines`, { id: id(), name: 'Cesnak', kind: 'aromatic', grams: 5 });
     const res = await t.call('GET', '/api/lines/recent');
-    expect(res.body.map((r: { name: string }) => r.name)).toEqual(['cesnak', 'Voda']);
+    expect(res.body.map((r: { name: string }) => r.name)).toEqual(['Cesnak', 'Voda']);
+    expect(res.body[0].step_types.sort()).toEqual(['blend', 'ferment']);
+    expect(res.body[1].step_types).toEqual(['ferment']);
   });
 });
 

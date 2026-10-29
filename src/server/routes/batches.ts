@@ -160,21 +160,23 @@ export function batchRoutes(ctx: AppContext) {
   });
 
   // Names for the ingredient chips (SPEC §8.1 item 12): the latest use of each
-  // name and kind, most recent first, with the variety it was weighed as.
-  r.get('/lines/recent', (c) =>
-    c.json(
-      db
-        .prepare(
-          `SELECT l.name, l.kind, l.local_name, l.catalog_id, lot.variety_id, MAX(l.created_at) AS last_used
-             FROM ingredient_lines l
-             LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
-            GROUP BY l.name COLLATE NOCASE, l.kind
-            ORDER BY last_used DESC
-            LIMIT 40`,
-        )
-        .all(),
-    ),
-  );
+  // name and kind, most recent first, with the variety it was weighed as and
+  // the step types it went into, so a step can offer its usual ingredients first.
+  r.get('/lines/recent', (c) => {
+    const rows = db
+      .prepare(
+        `SELECT l.name, l.kind, l.catalog_id, lot.variety_id, MAX(l.created_at) AS last_used,
+                json_group_array(DISTINCT s.type) AS step_types
+           FROM ingredient_lines l
+           JOIN steps s ON s.id = l.step_id
+           LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
+          GROUP BY l.name COLLATE NOCASE, l.kind
+          ORDER BY last_used DESC
+          LIMIT 40`,
+      )
+      .all() as (Row & { step_types: string })[];
+    return c.json(rows.map((row) => ({ ...row, step_types: JSON.parse(row.step_types) as string[] })));
+  });
 
   r.patch('/lines/:id', jsonBody(Line.patch), (c) => {
     const id = c.req.param('id');
