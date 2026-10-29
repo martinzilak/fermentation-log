@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
 import { snapshot } from './backup.ts';
@@ -32,7 +33,14 @@ if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
 
 if (config.devUser) console.warn(`DEV MODE: every request acts as ${config.devUser}`);
 
-const app = createApp({ config, db, mediaDir: path.join(config.dataDir, 'media') });
+// dist/web relative to the package root, from both src/server and dist/server.
+const webDir = fileURLToPath(new URL('../../dist/web', import.meta.url));
+const app = createApp({
+  config,
+  db,
+  mediaDir: path.join(config.dataDir, 'media'),
+  ...(fs.existsSync(path.join(webDir, 'index.html')) ? { webDir } : {}),
+});
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.bindHost }, (info) => {
   console.log(`Listening on ${info.address}:${info.port}`);
 });

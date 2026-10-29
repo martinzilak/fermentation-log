@@ -7,12 +7,23 @@ import { loadConfig } from './config.ts';
 import { migrate, openDb } from './db.ts';
 import type { PeerResolver } from './auth.ts';
 
-export function testApp(env: NodeJS.ProcessEnv = { DEV_USER: 'cook@example.com' }, getPeer?: PeerResolver) {
+export function testApp(
+  env: NodeJS.ProcessEnv = { DEV_USER: 'cook@example.com' },
+  getPeer?: PeerResolver,
+  webDir?: string,
+) {
   const db = openDb(':memory:');
   migrate(db);
   const mediaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ferment-media-'));
   let now = new Date('2026-10-29T10:00:00.000Z');
-  const app = createApp({ config: loadConfig(env), db, mediaDir, now: () => now, ...(getPeer ? { getPeer } : {}) });
+  const app = createApp({
+    config: loadConfig(env),
+    db,
+    mediaDir,
+    now: () => now,
+    ...(getPeer ? { getPeer } : {}),
+    ...(webDir ? { webDir } : {}),
+  });
 
   async function call(method: string, url: string, body?: unknown) {
     const res = await app.request(url, {
