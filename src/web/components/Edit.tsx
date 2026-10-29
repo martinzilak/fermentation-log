@@ -88,6 +88,9 @@ export function TextField({ label, value, onSave, multiline = false, required = 
         <Input
           {...common}
           type={type}
+          // iOS sizes a native date input to its content and ignores the
+          // width unless its own appearance is turned off.
+          className={type === 'date' ? 'block appearance-none text-left [&::-webkit-date-and-time-value]:text-left' : undefined}
           inputMode={inputMode}
           enterKeyHint="done"
           onChange={(e) => setText(e.target.value)}
