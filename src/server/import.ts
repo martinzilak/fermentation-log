@@ -101,7 +101,7 @@ export function importBatchFile(db: DB, text: string, opts: ImportOptions): Impo
   const { frontmatter: fm, body } = parseBatchFile(text);
   const meta = { created_at: opts.now, updated_at: opts.now, author: opts.author };
 
-  const existing = db.prepare('SELECT id FROM batches WHERE number = ?').pluck().get(fm.batch) as string | undefined;
+  const existing = db.prepare('SELECT id FROM batches WHERE number = ? AND deleted_at IS NULL').pluck().get(fm.batch) as string | undefined;
   if (existing && !opts.force) return { number: fm.batch, result: 'skipped', id: existing };
 
   const findOrCreate = (table: string, name: string, extra: Row): string => {

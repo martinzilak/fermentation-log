@@ -62,16 +62,46 @@ describe('batches', () => {
 });
 
 describe('deleting a batch', () => {
-  it('removes its steps, lines and events and is idempotent', async () => {
+  it('hides it from the list and the next number but keeps its rows, and is idempotent', async () => {
+    await newBatch();
     const batch = await newBatch();
     const step = await addStep(batch.id, { type: 'ferment', date: '2026-10-20' });
     await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name: 'Habanero', kind: 'pepper', grams: 500 });
-    await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'note', text: 'Smells good' });
     expect((await t.call('DELETE', `/api/batches/${batch.id}`)).status).toBe(204);
     expect((await t.call('DELETE', `/api/batches/${batch.id}`)).status).toBe(204);
-    for (const table of ['batches', 'steps', 'ingredient_lines', 'events']) {
-      expect(t.db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get()).toBe(0);
-    }
+    expect((await t.call('GET', `/api/batches/${batch.id}`)).status).toBe(404);
+    expect((await t.call('GET', '/api/batches')).body.map((b: { number: number }) => b.number)).toEqual([1]);
+    expect((await t.call('GET', '/api/lines/recent')).body).toEqual([]);
+    expect(t.db.prepare('SELECT COUNT(*) FROM ingredient_lines').pluck().get()).toBe(1);
+    expect((await newBatch()).number).toBe(2);
+  });
+
+  it('restores a deleted batch unless its number was taken again', async () => {
+    const batch = await newBatch();
+    await t.call('DELETE', `/api/batches/${batch.id}`);
+    const restored = await t.call('POST', `/api/batches/${batch.id}/restore`);
+    expect(restored.status).toBe(200);
+    expect(restored.body.number).toBe(1);
+    expect((await t.call('GET', '/api/batches')).body).toHaveLength(1);
+
+    await t.call('DELETE', `/api/batches/${batch.id}`);
+    await newBatch();
+    expect((await t.call('POST', `/api/batches/${batch.id}/restore`)).status).toBe(409);
+  });
+
+  it('refuses to delete a bottled batch', async () => {
+    const batch = await newBatch();
+    await addStep(batch.id, { type: 'ferment', date: '2026-10-01' });
+    await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'bottled', payload: { fills: [] } });
+    expect((await t.call('DELETE', `/api/batches/${batch.id}`)).status).toBe(409);
+    expect((await t.call('GET', `/api/batches/${batch.id}`)).status).toBe(200);
+  });
+
+  it('takes no new steps or events once deleted', async () => {
+    const batch = await newBatch();
+    await t.call('DELETE', `/api/batches/${batch.id}`);
+    expect((await t.call('POST', `/api/batches/${batch.id}/steps`, { id: id(), type: 'ferment' })).status).toBe(404);
+    expect((await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'note', text: 'x' })).status).toBe(404);
   });
 });
 

@@ -33,6 +33,13 @@ export function batchRoutes(ctx: AppContext) {
     attachments: db.prepare('SELECT * FROM attachments WHERE event_id = ? ORDER BY created_at').all(id),
   });
 
+  /** A batch that hasn't been deleted; a deleted one is gone as far as the API is concerned. */
+  function requireBatch(id: string): Row {
+    const batch = requireRow(db, 'batches', id, 'Batch');
+    if (batch.deleted_at !== null) throw new ApiError(404, 'Batch not found');
+    return batch;
+  }
+
   function requireStepInBatch(stepId: string | null | undefined, batchId: string) {
     if (!stepId) return;
     const step = getRow(db, 'steps', stepId);
@@ -47,22 +54,27 @@ export function batchRoutes(ctx: AppContext) {
 
   r.post('/batches', jsonBody(Batch.create), (c) => {
     const body = c.req.valid('json');
-    if (getRow(db, 'batches', body.id)) return c.json(batchView(body.id), 200);
+    if (getRow(db, 'batches', body.id)) {
+      requireBatch(body.id);
+      return c.json(batchView(body.id), 200);
+    }
     const { now, author } = meta(ctx, c);
-    const number = body.number ?? (db.prepare('SELECT COALESCE(MAX(number), 0) + 1 FROM batches').pluck().get() as number);
+    const number =
+      body.number ??
+      (db.prepare('SELECT COALESCE(MAX(number), 0) + 1 FROM batches WHERE deleted_at IS NULL').pluck().get() as number);
     insert(db, 'batches', { ...body, number, created_at: now, updated_at: now, author }, BATCH_COLS);
     return c.json(batchView(body.id), 201);
   });
 
   r.get('/batches/:id', (c) => {
-    const batch = batchView(c.req.param('id'));
-    if (!batch) throw new ApiError(404, 'Batch not found');
-    return c.json(batch);
+    const id = c.req.param('id');
+    requireBatch(id);
+    return c.json(batchView(id));
   });
 
   r.patch('/batches/:id', jsonBody(BatchPatch), (c) => {
     const id = c.req.param('id');
-    requireRow(db, 'batches', id, 'Batch');
+    requireBatch(id);
     const { status, ...fields } = c.req.valid('json');
     const { now } = meta(ctx, c);
     const values: Row = { ...fields, updated_at: now };
@@ -75,18 +87,37 @@ export function batchRoutes(ctx: AppContext) {
     return c.json(batchView(id));
   });
 
-  // Undo of a new batch, and the edit screen. Steps, lines and events go with
-  // it; attachment files stay on disk as with event deletes.
+  // Undo of a new batch, and the edit screen. A soft delete (SPEC §15.2): the
+  // rows stay so the restore below can bring the batch back. A finished batch
+  // is archived rather than deleted.
   r.delete('/batches/:id', (c) => {
-    db.prepare('DELETE FROM batches WHERE id = ?').run(c.req.param('id'));
+    const batch = getRow(db, 'batches', c.req.param('id'));
+    if (batch && batch.deleted_at === null) {
+      if (batch.status === 'bottled' || batch.status === 'archived') {
+        throw new ApiError(409, 'A bottled or archived batch cannot be deleted');
+      }
+      const { now } = meta(ctx, c);
+      db.prepare('UPDATE batches SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, batch.id);
+    }
     return c.body(null, 204);
+  });
+
+  // Undo of a delete. Fails with 409 if a new batch has taken its number since.
+  r.post('/batches/:id/restore', (c) => {
+    const batch = requireRow(db, 'batches', c.req.param('id'), 'Batch');
+    if (batch.deleted_at !== null) {
+      const taken = db.prepare('SELECT 1 FROM batches WHERE number = ? AND deleted_at IS NULL').get(batch.number);
+      if (taken) throw new ApiError(409, `Batch #${batch.number} exists again`);
+      db.prepare('UPDATE batches SET deleted_at = NULL, updated_at = ? WHERE id = ?').run(meta(ctx, c).now, batch.id);
+    }
+    return c.json(batchView(batch.id as string));
   });
 
   // --- Steps ---
 
   r.post('/batches/:id/steps', jsonBody(Step.create), (c) => {
     const batchId = c.req.param('id');
-    requireRow(db, 'batches', batchId, 'Batch');
+    requireBatch(batchId);
     const body = c.req.valid('json');
     if (getRow(db, 'steps', body.id)) return c.json(stepView(body.id), 200);
     const params = check(parseStepParams(body.type, body.params), 'params');
@@ -169,6 +200,7 @@ export function batchRoutes(ctx: AppContext) {
                 json_group_array(DISTINCT s.type) AS step_types
            FROM ingredient_lines l
            JOIN steps s ON s.id = l.step_id
+           JOIN batches b ON b.id = l.batch_id AND b.deleted_at IS NULL
            LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
           GROUP BY l.name COLLATE NOCASE, l.kind
           ORDER BY last_used DESC
@@ -194,7 +226,7 @@ export function batchRoutes(ctx: AppContext) {
 
   r.post('/batches/:id/events', jsonBody(Event.create), (c) => {
     const batchId = c.req.param('id');
-    requireRow(db, 'batches', batchId, 'Batch');
+    requireBatch(batchId);
     const body = c.req.valid('json');
     if (getRow(db, 'events', body.id)) return c.json(eventView(body.id), 200);
     requireStepInBatch(body.step_id, batchId);

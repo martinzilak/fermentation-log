@@ -39,6 +39,7 @@ interface BatchRow extends Row, Audit {
   status_manual: boolean;
   recipe_id: string | null;
   notes_md: string;
+  deleted_at: string | null;
 }
 
 interface StepRow extends Row, Audit {
@@ -178,6 +179,7 @@ export function listBatches(db: DB, ctx: ViewContext) {
               (SELECT s.date FROM steps s WHERE s.batch_id = b.id AND s.type = 'ferment'
                 ORDER BY s.position LIMIT 1) AS ferment_date
          FROM batches b
+        WHERE b.deleted_at IS NULL
         ORDER BY b.number DESC`,
     )
     .all() as Row[];
