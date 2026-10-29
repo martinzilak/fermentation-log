@@ -309,3 +309,59 @@ describe('later milestones', () => {
     expect((await t.call('GET', '/api/export.zip')).status).toBe(501);
   });
 });
+
+describe('merging and deleting entries', () => {
+  async function lineIn(name: string, kind: string, extra: Record<string, unknown> = {}) {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment' });
+    return (await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name, kind, grams: 10, ...extra })).body;
+  }
+
+  it('moves the lines of a merged catalog item and keeps its names as aliases', async () => {
+    const typo = await lineIn('Garlik', 'aromatic');
+    const garlic = t.db.prepare("SELECT id FROM catalog_items WHERE name = 'Garlic'").pluck().get() as string;
+    const res = await t.call('POST', `/api/catalog/${typo.catalog_id}/merge`, { into: garlic });
+    expect(res.status).toBe(200);
+    expect(res.body.aliases).toEqual(['Cesnak', 'Garlik']);
+    expect(t.db.prepare('SELECT name, catalog_id FROM ingredient_lines WHERE id = ?').get(typo.id)).toEqual({ name: 'Garlic', catalog_id: garlic });
+    expect(t.db.prepare('SELECT COUNT(*) FROM catalog_items WHERE id = ?').pluck().get(typo.catalog_id)).toBe(0);
+  });
+
+  it('moves the lots of a merged variety and takes its SHU when the kept one has none', async () => {
+    const kept = (await t.call('POST', '/api/varieties', { id: id(), name: 'Habanero' })).body;
+    const other = (await t.call('POST', '/api/varieties', { id: id(), name: 'Habanero Orange', shu_min: 100000, shu_max: 350000 })).body;
+    const lot = (await t.call('POST', '/api/lots', { id: id(), variety_id: other.id, season: 2026, origin: 'grown' })).body;
+    const line = await lineIn('Habanero Orange', 'pepper', { lot_id: lot.id });
+    const merged = (await t.call('POST', `/api/varieties/${other.id}/merge`, { into: kept.id })).body;
+    expect(merged).toMatchObject({ shu_min: 100000, shu_max: 350000, aliases: ['Habanero Orange'] });
+    expect(t.db.prepare('SELECT variety_id FROM pepper_lots WHERE id = ?').pluck().get(lot.id)).toBe(kept.id);
+    expect(t.db.prepare('SELECT name, variety_id FROM ingredient_lines WHERE id = ?').get(line.id)).toEqual({ name: 'Habanero', variety_id: kept.id });
+  });
+
+  it('counts uses and deletes only what is unused', async () => {
+    const line = await lineIn('Garlik', 'aromatic');
+    const item = (await t.call('GET', '/api/catalog')).body.find((c: { id: string }) => c.id === line.catalog_id);
+    expect(item.uses).toBe(1);
+    expect((await t.call('DELETE', `/api/catalog/${line.catalog_id}`)).status).toBe(409);
+    await t.call('DELETE', `/api/lines/${line.id}`);
+    expect((await t.call('DELETE', `/api/catalog/${line.catalog_id}`)).status).toBe(204);
+
+    const bottle = (await t.call('POST', '/api/bottle-types', { id: id(), name: 'Woozy', volume_ml: 150 })).body;
+    const batch = await newBatch();
+    const fills = [{ bottle_type_id: bottle.id, count: 6 }, { volume_ml: 330, count: 1, label: 'Jam jar' }];
+    const bottled = await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'bottled', payload: { fills } });
+    expect(bottled.status).toBe(201);
+    expect((await t.call('GET', `/api/batches/${batch.id}`)).body.derived.bottled_volume_ml).toBe(1230);
+    expect((await t.call('GET', '/api/bottle-types')).body[0].uses).toBe(1);
+    expect((await t.call('DELETE', `/api/bottle-types/${bottle.id}`)).status).toBe(409);
+  });
+
+  it('moves the lines of a lot given to another variety', async () => {
+    const a = (await t.call('POST', '/api/varieties', { id: id(), name: 'Cayenne' })).body;
+    const b = (await t.call('POST', '/api/varieties', { id: id(), name: 'Cayenne Long' })).body;
+    const lot = (await t.call('POST', '/api/lots', { id: id(), variety_id: a.id, season: 2026, origin: 'bought' })).body;
+    const line = await lineIn('x', 'pepper', { lot_id: lot.id });
+    await t.call('PATCH', `/api/lots/${lot.id}`, { variety_id: b.id });
+    expect(t.db.prepare('SELECT name, variety_id FROM ingredient_lines WHERE id = ?').get(line.id)).toEqual({ name: 'Cayenne Long', variety_id: b.id });
+  });
+});
