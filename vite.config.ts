@@ -34,10 +34,18 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell only (SPEC §8.5); API reads and media stay network-only until M4.
+        // The app shell (SPEC §8.5). API reads are kept by the app itself
+        // (src/web/lib/query.ts); photos never change, so they are cached here.
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/healthz/],
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/media/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'media', expiration: { maxEntries: 500 }, cacheableResponse: { statuses: [200] } },
+          },
+        ],
       },
     }),
   ],
