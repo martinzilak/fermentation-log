@@ -107,16 +107,18 @@ Run these once after the first deploy and record the results below.
    ```
 5. **Record only:** with Tailscale switched off on the iPhone and VPN On Demand set for `*.ts.net`, does opening the Home Screen app bring Tailscale up?
 
-**Results:** _(fill in)_
+**Results (2026-10-29, Unraid 7 "Use Tailscale" path; the Compose fallback was not needed):**
 
 | Check | Result | Notes |
 |---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 | | |
-| 5 | | |
-| `update_container` recreates from a local tag | | |
+| 1 | Pass | Loads on the iPhone; installed to the Home Screen |
+| 2 | Pass | `/api/me` returns the Serve login |
+| 3 | Pass | Serve proxies to `http://localhost:3000` inside the container |
+| 4 | Pass | Not reachable from the LAN or the Docker bridge IP |
+| 5 | Yes | VPN On Demand brings Tailscale up when the app opens |
+| `update_container` recreates from a local tag | Pass | `deploy-nas.sh` ends with "healthy" |
+
+The first start's certificate request can outlast the Unraid hook's wait ("Can't generate certificates!"); Tailscale finishes it in the background, and the site works a minute or two later.
 
 If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tailscale` sidecar with `network_mode: service:tailscale`) and document it here.
 
