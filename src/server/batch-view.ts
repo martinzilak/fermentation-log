@@ -94,11 +94,10 @@ export function loadBatch(db: DB, id: string, ctx: ViewContext) {
   );
   const lineRows = db
     .prepare(
-      `SELECT l.*, lot.variety_id, v.name AS variety_name,
+      `SELECT l.*, v.name AS variety_name,
               v.shu_min AS variety_shu_min, v.shu_max AS variety_shu_max, v.shu_source AS variety_shu_source
          FROM ingredient_lines l
-         LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
-         LEFT JOIN varieties v ON v.id = lot.variety_id
+         LEFT JOIN varieties v ON v.id = l.variety_id
         WHERE l.batch_id = ?
         ORDER BY l.position, l.created_at`,
     )

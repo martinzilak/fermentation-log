@@ -17,6 +17,7 @@ import {
 } from '../../shared/schemas.ts';
 import type { AppEnv } from '../auth.ts';
 import { BATCH_COLS, EVENT_COLS, STEP_COLS, listBatches, loadBatch, refreshStatus } from '../batch-view.ts';
+import { resolveLine, type ResolvedLine } from '../entries.ts';
 import { ApiError, check, jsonBody, meta, type AppContext } from '../http.ts';
 import { decode, getRow, insert, nextPosition, requireRow, update, type Row } from '../store.ts';
 
@@ -172,37 +173,41 @@ export function batchRoutes(ctx: AppContext) {
   });
 
   // --- Ingredient lines ---
+  // A line refers to a catalog item or a variety (SPEC §15.3): the ids sent
+  // win, else the name finds or creates the entry, whose name and kind the
+  // line then carries.
 
   r.post('/steps/:id/lines', jsonBody(Line.create), (c) => {
     const step = requireRow(db, 'steps', c.req.param('id'), 'Step');
     const body = c.req.valid('json');
     if (getRow(db, 'ingredient_lines', body.id)) return c.json(lineView(body.id), 200);
     const { now, author } = meta(ctx, c);
-    insert(db, 'ingredient_lines', {
-      ...body,
-      batch_id: step.batch_id,
-      step_id: step.id,
-      position: body.position ?? nextPosition(db, 'ingredient_lines', 'step_id', step.id as string),
-      created_at: now,
-      updated_at: now,
-      author,
-    });
+    db.transaction(() => {
+      insert(db, 'ingredient_lines', {
+        ...body,
+        ...resolveLine(db, body, { now, author }),
+        batch_id: step.batch_id,
+        step_id: step.id,
+        position: body.position ?? nextPosition(db, 'ingredient_lines', 'step_id', step.id as string),
+        created_at: now,
+        updated_at: now,
+        author,
+      });
+    })();
     return c.json(lineView(body.id), 201);
   });
 
   // Names for the ingredient chips (SPEC §8.1 item 12): the latest use of each
-  // name and kind, most recent first, with the variety it was weighed as and
-  // the step types it went into, so a step can offer its usual ingredients first.
+  // entry, most recent first, with the step types it went into, so a step can offer its usual ingredients first.
   r.get('/lines/recent', (c) => {
     const rows = db
       .prepare(
-        `SELECT l.name, l.kind, l.catalog_id, lot.variety_id, MAX(l.created_at) AS last_used,
+        `SELECT l.name, l.kind, l.catalog_id, l.variety_id, MAX(l.created_at) AS last_used,
                 json_group_array(DISTINCT s.type) AS step_types
            FROM ingredient_lines l
            JOIN steps s ON s.id = l.step_id
            JOIN batches b ON b.id = l.batch_id AND b.deleted_at IS NULL
-           LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
-          GROUP BY l.name COLLATE NOCASE, l.kind
+          GROUP BY l.catalog_id, l.variety_id
           ORDER BY last_used DESC
           LIMIT 40`,
       )
@@ -210,10 +215,31 @@ export function batchRoutes(ctx: AppContext) {
     return c.json(rows.map((row) => ({ ...row, step_types: JSON.parse(row.step_types) as string[] })));
   });
 
+  // Sending a name or an entry id moves the line to that entry; sending only
+  // a lot or a kind keeps the entry where it can.
   r.patch('/lines/:id', jsonBody(Line.patch), (c) => {
     const id = c.req.param('id');
-    requireRow(db, 'ingredient_lines', id, 'Line');
-    update(db, 'ingredient_lines', id, { ...c.req.valid('json'), updated_at: meta(ctx, c).now });
+    const existing = requireRow(db, 'ingredient_lines', id, 'Line') as Row & ResolvedLine;
+    const body = c.req.valid('json');
+    const { now, author } = meta(ctx, c);
+    const moved = body.name !== undefined || body.catalog_id !== undefined || body.variety_id !== undefined;
+    const kind = body.kind ?? existing.kind;
+    const keepEntry = !moved && kind === existing.kind;
+    const identity =
+      moved || body.kind !== undefined || body.lot_id !== undefined
+        ? resolveLine(
+            db,
+            {
+              name: body.name ?? existing.name,
+              kind,
+              catalog_id: moved ? body.catalog_id : keepEntry ? existing.catalog_id : null,
+              variety_id: moved ? body.variety_id : keepEntry ? existing.variety_id : null,
+              lot_id: body.lot_id !== undefined ? body.lot_id : keepEntry ? existing.lot_id : null,
+            },
+            { now, author },
+          )
+        : {};
+    db.transaction(() => update(db, 'ingredient_lines', id, { ...body, ...identity, updated_at: now }))();
     return c.json(lineView(id));
   });
 

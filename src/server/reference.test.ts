@@ -39,6 +39,8 @@ describe('reference data and settings', () => {
       aliases: ['Ocot kvasný liehový 8 %', 'ocot'],
     });
     expect(catalog.find((c) => c.name === 'Salt')).toMatchObject({ kind: 'salt', aliases: ['Soľ'] });
+    const varieties = (await t.call('GET', '/api/varieties')).body as { name: string; aliases: string[] }[];
+    expect(varieties.find((v) => v.name === 'Jalapeño Red')?.aliases).toEqual(['Jalapeno červené']);
   });
 
   it('refuses propagation for bought lots', async () => {

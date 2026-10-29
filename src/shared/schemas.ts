@@ -128,6 +128,7 @@ export const Line = resource(
     planned_g: v.nullable(Grams),
     lot_id: v.nullable(Id),
     catalog_id: v.nullable(Id),
+    variety_id: v.nullable(Id),
     shu_min: v.nullable(Shu),
     shu_max: v.nullable(Shu),
     shu_source: v.nullable(Text),
@@ -151,6 +152,7 @@ export const Variety = resource(
   { name: Name },
   {
     species: v.nullable(Name),
+    aliases: v.array(Name),
     local_names: v.array(Name),
     shu_min: v.nullable(Shu),
     shu_max: v.nullable(Shu),
@@ -173,8 +175,9 @@ export const Lot = resource(
   },
 );
 
+// Peppers are varieties, not catalog items (SPEC §15.3).
 export const CatalogItem = resource(
-  { name: Name, kind: v.picklist(KINDS) },
+  { name: Name, kind: v.picklist(KINDS.filter((k) => k !== 'pepper')) },
   { aliases: v.array(Name), notes: v.nullable(Text) },
 );
 

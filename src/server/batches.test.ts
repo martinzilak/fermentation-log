@@ -184,7 +184,7 @@ describe('steps and lines', () => {
 });
 
 describe('recent ingredient names', () => {
-  it('lists each name and kind once, latest use first, case-insensitively', async () => {
+  it('lists each entry once, latest use first', async () => {
     const batch = await newBatch();
     const step = await addStep(batch.id, { type: 'ferment', date: '2026-10-20' });
     const add = async (name: string, kind: string) => {
@@ -194,14 +194,77 @@ describe('recent ingredient names', () => {
     t.setNow('2026-10-29T11:00:00.000Z');
     await add('Voda', 'water');
     t.setNow('2026-10-29T12:00:00.000Z');
-    await add('cesnak', 'aromatic');
+    await add('garlic', 'aromatic');
     const blend = await addStep(batch.id, { type: 'blend' });
     t.setNow('2026-10-29T13:00:00.000Z');
-    await t.call('POST', `/api/steps/${blend.id}/lines`, { id: id(), name: 'Cesnak', kind: 'aromatic', grams: 5 });
+    await t.call('POST', `/api/steps/${blend.id}/lines`, { id: id(), name: 'Garlic', kind: 'aromatic', grams: 5 });
     const res = await t.call('GET', '/api/lines/recent');
-    expect(res.body.map((r: { name: string }) => r.name)).toEqual(['Cesnak', 'Voda']);
+    expect(res.body.map((r: { name: string }) => r.name)).toEqual(['Garlic', 'Water']);
     expect(res.body[0].step_types.sort()).toEqual(['blend', 'ferment']);
     expect(res.body[1].step_types).toEqual(['ferment']);
+  });
+});
+
+describe('normalized ingredient lines', () => {
+  async function ferment() {
+    const batch = await newBatch();
+    return addStep(batch.id, { type: 'ferment', date: '2026-10-20' });
+  }
+  const post = (stepId: string, body: Record<string, unknown>) =>
+    t.call('POST', `/api/steps/${stepId}/lines`, { id: id(), grams: 10, ...body });
+
+  it('resolves a name through aliases, ignoring case and accents, to the entry and its kind', async () => {
+    const step = await ferment();
+    const line = (await post(step.id, { name: 'SOL', kind: 'other' })).body;
+    expect(line).toMatchObject({ name: 'Salt', kind: 'salt', variety_id: null });
+    expect(line.catalog_id).toBe(t.db.prepare("SELECT id FROM catalog_items WHERE name = 'Salt'").pluck().get());
+  });
+
+  it('creates an entry for a new name, tidied, and reuses it', async () => {
+    const step = await ferment();
+    const first = (await post(step.id, { name: '  red   currant ', kind: 'fruit' })).body;
+    const again = (await post(step.id, { name: 'Red Currant', kind: 'fruit' })).body;
+    expect(first.name).toBe('Red currant');
+    expect(again.catalog_id).toBe(first.catalog_id);
+    const pepper = (await post(step.id, { name: 'aji charapita', kind: 'pepper' })).body;
+    expect(pepper).toMatchObject({ name: 'Aji charapita', catalog_id: null });
+    expect(t.db.prepare('SELECT name FROM varieties WHERE id = ?').pluck().get(pepper.variety_id)).toBe('Aji charapita');
+  });
+
+  it('takes the variety from the lot and refuses a lot of another variety', async () => {
+    const step = await ferment();
+    const habanero = (await t.call('POST', '/api/varieties', { id: id(), name: 'Habanero' })).body;
+    const other = (await t.call('POST', '/api/varieties', { id: id(), name: 'Cayenne' })).body;
+    const lot = (await t.call('POST', '/api/lots', { id: id(), variety_id: habanero.id, season: 2026, origin: 'grown' })).body;
+    const line = (await post(step.id, { name: 'whatever', kind: 'pepper', lot_id: lot.id })).body;
+    expect(line).toMatchObject({ name: 'Habanero', variety_id: habanero.id, lot_id: lot.id });
+    const bad = await post(step.id, { name: 'Cayenne', kind: 'pepper', variety_id: other.id, lot_id: lot.id });
+    expect(bad.status).toBe(400);
+    expect(bad.body.issues[0].path).toBe('lot_id');
+  });
+
+  it('moves a line to another entry on PATCH, and keeps it when only the grams change', async () => {
+    const step = await ferment();
+    const line = (await post(step.id, { name: 'Voda', kind: 'water' })).body;
+    const grams = (await t.call('PATCH', `/api/lines/${line.id}`, { grams: 20 })).body;
+    expect(grams).toMatchObject({ name: 'Water', catalog_id: line.catalog_id, grams: 20 });
+    const moved = (await t.call('PATCH', `/api/lines/${line.id}`, { name: 'Brine', kind: 'brine' })).body;
+    expect(moved).toMatchObject({ name: 'Brine', kind: 'brine', grams: 20 });
+    expect(moved.catalog_id).not.toBe(line.catalog_id);
+  });
+
+  it('copies a renamed entry onto its lines and refuses a name another entry answers to', async () => {
+    const step = await ferment();
+    const line = (await post(step.id, { name: 'Cesnak', kind: 'aromatic' })).body;
+    const renamed = await t.call('PATCH', `/api/catalog/${line.catalog_id}`, { name: 'Garlic cloves', kind: 'vegetable' });
+    expect(renamed.status).toBe(200);
+    expect(t.db.prepare('SELECT name, kind FROM ingredient_lines WHERE id = ?').get(line.id)).toEqual({
+      name: 'Garlic cloves',
+      kind: 'vegetable',
+    });
+    expect((await t.call('PATCH', `/api/catalog/${line.catalog_id}`, { name: 'voda' })).status).toBe(409);
+    expect((await t.call('POST', '/api/catalog', { id: id(), name: 'Soľ', kind: 'salt' })).status).toBe(409);
+    expect((await t.call('POST', '/api/catalog', { id: id(), name: 'Bell pepper', kind: 'pepper' })).status).toBe(400);
   });
 });
 
