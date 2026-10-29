@@ -150,7 +150,10 @@ export function netWeight(grossG: number, tareG: number | null | undefined): num
 }
 
 export function bottledVolumeMl(payload: BottledPayload, volumeMl: (bottleTypeId: string) => number | undefined) {
-  return payload.fills.reduce((sum, f) => sum + f.count * (volumeMl(f.bottle_type_id) ?? 0), 0);
+  return payload.fills.reduce(
+    (sum, f) => sum + f.count * ('volume_ml' in f ? f.volume_ml : (volumeMl(f.bottle_type_id) ?? 0)),
+    0,
+  );
 }
 
 export interface DeriveOptions {

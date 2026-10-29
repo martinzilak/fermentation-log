@@ -141,6 +141,11 @@ describe('small helpers', () => {
     const payload = { fills: [{ bottle_type_id: 'a', count: 6 }, { bottle_type_id: 'b', count: 2 }] };
     expect(bottledVolumeMl(payload, (id) => volumes[id])).toBe(1400);
   });
+
+  it('adds one-off bottles by their own volume', () => {
+    const payload = { fills: [{ bottle_type_id: 'a', count: 2 }, { volume_ml: 330, count: 1, label: 'Old jam jar' }] };
+    expect(bottledVolumeMl(payload, () => 150)).toBe(630);
+  });
 });
 
 describe('derive', () => {

@@ -61,10 +61,18 @@ export type FermentParams = v.InferOutput<typeof StepParams.ferment>;
 
 // --- Event payloads, typed per event type (SPEC §6.2) ---
 
-export const Fill = v.object({
-  bottle_type_id: Id,
-  count: v.pipe(v.number(), v.integer(), v.minValue(1)),
-});
+const Count = v.pipe(v.number(), v.integer(), v.minValue(1));
+
+// A fill is a saved bottle type, or a one-off bottle that creates no type (SPEC §15.2).
+export const Fill = v.union([
+  v.strictObject({ bottle_type_id: Id, count: Count }),
+  v.strictObject({
+    volume_ml: v.pipe(v.number(), v.finite(), v.gtValue(0)),
+    count: Count,
+    label: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  }),
+]);
+export type Fill = v.InferOutput<typeof Fill>;
 
 export const EventPayload = {
   ph: v.object({
