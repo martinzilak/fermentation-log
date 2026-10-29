@@ -6,6 +6,7 @@ import type { Config } from './config.ts';
 import type { DB } from './db.ts';
 import { ApiError, type AppContext } from './http.ts';
 import { batchRoutes } from './routes/batches.ts';
+import { exportRoutes } from './routes/export.ts';
 import { mediaRoutes } from './routes/media.ts';
 import { referenceRoutes } from './routes/reference.ts';
 import { stubRoutes } from './routes/stubs.ts';
@@ -51,6 +52,7 @@ export function createApp({ config, db, mediaDir, webDir, getPeer = defaultPeer,
   app.get('/api/me', (c) => c.json(c.get('user')));
   app.route('/api', batchRoutes(ctx));
   app.route('/api', referenceRoutes(ctx));
+  app.route('/api', exportRoutes(ctx));
   app.route('/api', stubRoutes());
   app.route('/', mediaRoutes(ctx));
 

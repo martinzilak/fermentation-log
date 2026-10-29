@@ -12,8 +12,6 @@ export function stubRoutes() {
   r.patch('/recipes/:id', later('M5'));
   r.post('/recipes/:id/evaluate', later('M5'));
   r.post('/batches/:id/save-as-recipe', later('M5'));
-  r.get('/export.zip', later('M3'));
-  r.get('/batches/:id/export.md', later('M3'));
 
   return r;
 }

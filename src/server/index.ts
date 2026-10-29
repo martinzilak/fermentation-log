@@ -6,6 +6,7 @@ import { createApp } from './app.ts';
 import { snapshot } from './backup.ts';
 import { loadConfig } from './config.ts';
 import { migrate, openDb } from './db.ts';
+import { startNightly } from './nightly.ts';
 
 const STARTUP_BACKUPS_KEPT = 10;
 
@@ -41,12 +42,15 @@ const app = createApp({
   mediaDir: path.join(config.dataDir, 'media'),
   ...(fs.existsSync(path.join(webDir, 'index.html')) ? { webDir } : {}),
 });
+let stopNightly = () => {};
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.bindHost }, (info) => {
   console.log(`Listening on ${info.address}:${info.port}`);
+  stopNightly = startNightly({ db, dataDir: config.dataDir, mediaDir: path.join(config.dataDir, 'media'), timeZone: config.timeZone });
 });
 
 function shutdown(signal: string) {
   console.log(`${signal} received, shutting down`);
+  stopNightly();
   server.close(() => {
     db.close();
     process.exit(0);
