@@ -61,6 +61,20 @@ describe('batches', () => {
   });
 });
 
+describe('deleting a batch', () => {
+  it('removes its steps, lines and events and is idempotent', async () => {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment', date: '2026-10-20' });
+    await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name: 'Habanero', kind: 'pepper', grams: 500 });
+    await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'note', text: 'Smells good' });
+    expect((await t.call('DELETE', `/api/batches/${batch.id}`)).status).toBe(204);
+    expect((await t.call('DELETE', `/api/batches/${batch.id}`)).status).toBe(204);
+    for (const table of ['batches', 'steps', 'ingredient_lines', 'events']) {
+      expect(t.db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get()).toBe(0);
+    }
+  });
+});
+
 describe('status transitions', () => {
   it('follows steps and the bottled event, and respects a manual override', async () => {
     const batch = await newBatch();
@@ -135,6 +149,23 @@ describe('steps and lines', () => {
     const step = await addStep(batch.id, { type: 'ferment' });
     const res = await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name: 'X', kind: 'pepper', lot_id: id() });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('recent ingredient names', () => {
+  it('lists each name and kind once, latest use first, case-insensitively', async () => {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment', date: '2026-10-20' });
+    const add = async (name: string, kind: string) => {
+      await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name, kind, grams: 10 });
+    };
+    await add('Cesnak', 'aromatic');
+    t.setNow('2026-10-29T11:00:00.000Z');
+    await add('Voda', 'water');
+    t.setNow('2026-10-29T12:00:00.000Z');
+    await add('cesnak', 'aromatic');
+    const res = await t.call('GET', '/api/lines/recent');
+    expect(res.body.map((r: { name: string }) => r.name)).toEqual(['cesnak', 'Voda']);
   });
 });
 

@@ -75,6 +75,13 @@ export function batchRoutes(ctx: AppContext) {
     return c.json(batchView(id));
   });
 
+  // Undo of a new batch, and the edit screen. Steps, lines and events go with
+  // it; attachment files stay on disk as with event deletes.
+  r.delete('/batches/:id', (c) => {
+    db.prepare('DELETE FROM batches WHERE id = ?').run(c.req.param('id'));
+    return c.body(null, 204);
+  });
+
   // --- Steps ---
 
   r.post('/batches/:id/steps', jsonBody(Step.create), (c) => {
@@ -151,6 +158,23 @@ export function batchRoutes(ctx: AppContext) {
     });
     return c.json(lineView(body.id), 201);
   });
+
+  // Names for the ingredient chips (SPEC §8.1 item 12): the latest use of each
+  // name and kind, most recent first, with the variety it was weighed as.
+  r.get('/lines/recent', (c) =>
+    c.json(
+      db
+        .prepare(
+          `SELECT l.name, l.kind, l.local_name, l.catalog_id, lot.variety_id, MAX(l.created_at) AS last_used
+             FROM ingredient_lines l
+             LEFT JOIN pepper_lots lot ON lot.id = l.lot_id
+            GROUP BY l.name COLLATE NOCASE, l.kind
+            ORDER BY last_used DESC
+            LIMIT 40`,
+        )
+        .all(),
+    ),
+  );
 
   r.patch('/lines/:id', jsonBody(Line.patch), (c) => {
     const id = c.req.param('id');
