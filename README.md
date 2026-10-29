@@ -10,10 +10,15 @@ Requires Node 26 (`nvm use` picks it up from `.nvmrc`).
 
 ```sh
 npm ci
-npm run dev        # http://127.0.0.1:3000, acting as DEV_USER (default dev@example.com), data in ./data
+npm run dev        # API on http://127.0.0.1:3000, acting as DEV_USER (default dev@example.com), data in ./data
+npm run dev:web    # the app on http://localhost:5173, proxying /api and /media to the API
 npm test
 npm run typecheck
 ```
+
+Open the Vite URL during development. `npm run build` puts the server in `dist/server` and the PWA in `dist/web`; the server then serves the app itself on port 3000.
+
+The UI uses shadcn/ui components generated into `src/web/components/ui` (`npx shadcn@latest add <name>`). Their sizes are set for wet or gloved fingers (SPEC §8.1); keep that when adding components.
 
 `DEV_USER=<login>` makes the server act as that user without Tailscale headers. The server refuses to start when `DEV_USER` is set together with `NODE_ENV=production`.
 
@@ -125,6 +130,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 ## iPhone
 
 - Install the app from Safari: **Share → Add to Home Screen**.
+- If it was added before the app had its icon (M0's hello page), remove it and add it again to get the icon and full-screen mode.
 - In the Tailscale app, enable **VPN On Demand** with a rule that connects automatically for `*.ts.net` hostnames.
 
 ## Troubleshooting
