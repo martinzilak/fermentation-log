@@ -46,10 +46,11 @@ Keep the image name unqualified (`ferment-log:latest`). Unraid's updater tries a
 
 ## Unraid setup (first time)
 
-1. **Check git:** in the web terminal (the `>_` icon), run `git --version`. Unraid 7 includes git in the base OS.
-2. **User script:** install the **User Scripts** plugin from Community Applications. Then go to **Settings → User Scripts → Add New Script**, name it `ferment-log deploy`, and paste in the contents of `scripts/nas-bootstrap.sh`. Without the plugin, you can paste the same script into the web terminal instead.
-3. **First build:** click **Run Script** on `ferment-log deploy`. It builds the image, then says there is no container yet.
-4. **Create the container:** in the Unraid UI, go to **Docker → Add Container** and use these settings:
+1. **Tailnet DNS settings:** in the Tailscale admin console under **DNS**, enable **MagicDNS** and **HTTPS Certificates**. Without them, Serve can't get a certificate, and Unraid starts the container without Tailscale ("Enable MagicDNS and HTTPS on your Tailscale account"). Pick the tailnet name first if you want to change it, because the app's URL contains it. The certificates are publicly logged, so the tailnet name and the `ferment` hostname become public; the app itself stays reachable only from the tailnet.
+2. **Check git:** in the web terminal (the `>_` icon), run `git --version`. Unraid 7 includes git in the base OS.
+3. **User script:** install the **User Scripts** plugin from Community Applications. Then go to **Settings → User Scripts → Add New Script**, name it `ferment-log deploy`, and paste in the contents of `scripts/nas-bootstrap.sh`. Without the plugin, you can paste the same script into the web terminal instead.
+4. **First build:** click **Run Script** on `ferment-log deploy`. It builds the image, then says there is no container yet.
+5. **Create the container:** in the Unraid UI, go to **Docker → Add Container** and use these settings:
 
    | Setting | Value |
    |---|---|
@@ -67,8 +68,8 @@ Keep the image name unqualified (`ferment-log:latest`). Unraid's updater tries a
    | Variable `TZ` | `Europe/Bratislava` |
 
    Optional variables: `PUID` / `PGID` (default `99` / `100`, Unraid's nobody:users).
-5. **Apply:** when the hook starts, it downloads Tailscale, so the first start needs outbound internet. The container log then shows a Tailscale login link. Open it and approve the device on your tailnet.
-6. **Check the updater:** run the user script once more. It should finish with `ferment-log is healthy`. This confirms that Unraid's updater accepts a locally built image (see below).
+6. **Apply:** when the hook starts, it downloads Tailscale, so the first start needs outbound internet. The container log then shows a Tailscale login link. Open it and approve the device on your tailnet.
+7. **Check the updater:** run the user script once more. It should finish with `ferment-log is healthy`. This confirms that Unraid's updater accepts a locally built image (see below).
 
 ### If the updater ignores local images
 
