@@ -24,19 +24,46 @@ function targetSaltPct(db: DB): number {
   return Number(value ?? 3);
 }
 
-interface StepRow extends Row {
+interface Audit {
+  created_at: string;
+  updated_at: string;
+  author: string;
+}
+
+interface BatchRow extends Row, Audit {
   id: string;
+  number: number;
+  name: string | null;
+  color: string | null;
+  status: BatchStatus;
+  status_manual: boolean;
+  recipe_id: string | null;
+  notes_md: string;
+}
+
+interface StepRow extends Row, Audit {
+  id: string;
+  batch_id: string;
   type: StepType;
   position: number;
   date: string | null;
   params: unknown;
+  note: string | null;
 }
 
-interface LineRow extends Row {
+interface LineRow extends Row, Audit {
+  id: string;
+  batch_id: string;
   step_id: string;
+  position: number;
   name: string;
+  local_name: string | null;
   kind: Kind;
   grams: number | null;
+  planned_g: number | null;
+  lot_id: string | null;
+  catalog_id: string | null;
+  note: string | null;
   shu_min: number | null;
   shu_max: number | null;
   shu_source: string | null;
@@ -44,6 +71,7 @@ interface LineRow extends Row {
   variety_shu_max: number | null;
   variety_shu_source: string | null;
   variety_id: string | null;
+  variety_name: string | null;
 }
 
 /** SHU for a line: the line's own override, else its variety's (SPEC §6.2). */
@@ -58,7 +86,7 @@ function resolveShu(l: LineRow) {
 export function loadBatch(db: DB, id: string, ctx: ViewContext) {
   const batchRow = db.prepare('SELECT * FROM batches WHERE id = ?').get(id) as Row | undefined;
   if (!batchRow) return undefined;
-  const batch = decode(batchRow, BATCH_COLS);
+  const batch = decode(batchRow, BATCH_COLS) as BatchRow;
 
   const steps = (db.prepare('SELECT * FROM steps WHERE batch_id = ? ORDER BY position, created_at').all(id) as Row[]).map(
     (s) => decode(s, STEP_COLS) as StepRow,
@@ -134,7 +162,7 @@ export function loadBatch(db: DB, id: string, ctx: ViewContext) {
         : {}),
       attachments: attachments.filter((a) => a.event_id === e.id),
     })),
-    derived: derive(calcSteps, calcEvents, batch.status as string, {
+    derived: derive(calcSteps, calcEvents, batch.status, {
       timeZone: ctx.timeZone,
       today: today(ctx),
       targetSaltPct: targetSaltPct(db),
