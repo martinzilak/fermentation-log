@@ -6,11 +6,12 @@ import { PhLabel } from '@/components/Labels';
 import { NumpadFooter, Readout } from '@/components/Numpad';
 import { Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { parseDecimal } from '@/lib/numbers';
 import { invalidate } from '@/lib/query';
-import { goBack } from '@/lib/router';
+import { goBack, navigate } from '@/lib/router';
 import { readLocal, writeLocal } from '@/lib/storage';
 
 type Method = (typeof PH_METHODS)[number];
@@ -70,6 +71,9 @@ export function PhEvent({ batchId }: { batchId: string }) {
         <Readout value={value} />
         {ph !== null && ph <= 14 && <PhLabel value={ph} className="text-2xl" />}
       </div>
+      <Button variant="ghost" className="mt-2 px-0 underline" onClick={() => navigate('/ph-info')}>
+        {t('ph.whatMeans')}
+      </Button>
     </Screen>
   );
 }

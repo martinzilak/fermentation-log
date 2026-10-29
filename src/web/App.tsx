@@ -17,6 +17,7 @@ import { BottleTypeEditor, BottleTypeList, MoreMenu, SettingsScreen } from '@/sc
 import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
+import { PhInfo } from '@/screens/PhInfo';
 import { VoiceNote } from '@/screens/VoiceNote';
 import { Weighing } from '@/screens/Weighing';
 import type { ReactNode } from 'react';
@@ -47,6 +48,7 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/bottle-types', () => <BottleTypeList />],
   ['/bottle-types/:id', (p) => <BottleTypeEditor id={p.id!} />],
   ['/settings', () => <SettingsScreen />],
+  ['/ph-info', () => <PhInfo />],
 ];
 
 function route(path: string): ReactNode {

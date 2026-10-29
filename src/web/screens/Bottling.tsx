@@ -19,7 +19,7 @@ import { api } from '@/lib/api';
 import { stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, parseDecimal } from '@/lib/numbers';
 import { invalidate, useQuery } from '@/lib/query';
-import { goBack } from '@/lib/router';
+import { goBack, navigate } from '@/lib/router';
 import { readLocal, writeLocal } from '@/lib/storage';
 import type { BatchView, BottleType, Fill } from '@/lib/types';
 import { useWakeLock } from '@/lib/wakelock';
@@ -320,6 +320,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
         <Screen title={t('bottle.phTitle')} subtitle={subtitle} footer={numpad(() => go({ name: 'fills' }), next, { maxInt: 2 })}>
           <Chips>
             <Chip onClick={() => go({ name: 'phReason' })}>{t('bottle.notMeasured')}</Chip>
+            <Chip onClick={() => navigate('/ph-info')}>{t('ph.whatMeans')}</Chip>
           </Chips>
           <div className="mt-3">
             <Readout value={value} />

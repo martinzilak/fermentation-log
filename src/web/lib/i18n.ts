@@ -281,7 +281,14 @@ const en = {
   'ph.danger': 'Above 4.6 safety threshold',
   'ph.warn': 'Below 4.6, above common 4.0 target',
   'ph.ok': 'Below 4.0',
+  'ph.whatMeans': 'What do these mean?',
   'ph.meter': 'Meter',
+
+  'phInfo.title': 'pH labels',
+  'phInfo.threshold': 'pH 4.6 is the limit US food regulations use for acidified foods: at or below it, the bacterium behind botulism can’t grow.',
+  'phInfo.target': 'Many hot sauce makers aim for 4.0 or lower, to leave a margin for measuring error.',
+  'phInfo.notAdvice': 'The labels are information, not a safety check. A strip or an uncalibrated meter can be off by several tenths.',
+  'phInfo.sources': 'Sources',
   'ph.strip': 'Strip',
 
   'status.planned': 'Planned',
