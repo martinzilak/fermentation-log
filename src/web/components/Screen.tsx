@@ -4,6 +4,7 @@
 // never has to pick between two. The Undo toast sits just above the actions,
 // and safe-area insets keep standalone mode clear of the notch and home bar.
 import type { ReactNode } from 'react';
+import { ConnectionBanner, useBanner } from '@/components/ConnectionBanner';
 import { ToastSlot } from '@/components/Toast';
 
 interface Props {
@@ -16,11 +17,16 @@ interface Props {
 const sides = { paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' };
 
 export function Screen({ title, subtitle, children, footer }: Props) {
+  const banner = useBanner();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-10 bg-background pb-2" style={{ ...sides, paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-        <h1 className="text-2xl leading-tight font-bold">{title}</h1>
-        {subtitle && <div className="mt-1 text-lg text-muted-foreground">{subtitle}</div>}
+      <header className="sticky top-0 z-10 bg-background">
+        {banner && <ConnectionBanner state={banner} />}
+        {/* The banner, when shown, already clears the notch. */}
+        <div className="pb-2" style={{ ...sides, paddingTop: banner ? '1rem' : 'max(1rem, env(safe-area-inset-top))' }}>
+          <h1 className="text-2xl leading-tight font-bold">{title}</h1>
+          {subtitle && <div className="mt-1 text-lg text-muted-foreground">{subtitle}</div>}
+        </div>
       </header>
       <main className="flex-1 pb-4" style={sides}>
         {children}

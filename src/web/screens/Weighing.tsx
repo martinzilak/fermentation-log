@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatPct, parseDecimal } from '@/lib/numbers';
-import { invalidate, refresh, useQuery } from '@/lib/query';
+import { invalidate, missingTitle, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety } from '@/lib/types';
@@ -38,7 +38,7 @@ export function Weighing({ batchId, stepId }: { batchId: string; stepId: string 
   if (!batch || !step) {
     return (
       <Screen
-        title={error || batch ? t('app.notFound') : t('common.loading')}
+        title={batch ? t('app.notFound') : missingTitle(error)}
         footer={
           <Button variant="outline" onClick={() => goBack(`/b/${batchId}`)}>
             {t('common.back')}

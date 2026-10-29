@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
+import { usePingOnVisible } from '@/components/ConnectionBanner';
 import { Screen } from '@/components/Screen';
-import { ToastProvider } from '@/components/Toast';
+import { ToastProvider, useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
-import { api, useReachable } from '@/lib/api';
 import { t } from '@/lib/i18n';
-import { invalidate } from '@/lib/query';
+import { onRefused } from '@/lib/sync';
 import { matchPath, navigate, usePath } from '@/lib/router';
 import { AddStep } from '@/screens/AddStep';
 import { BatchDetail } from '@/screens/BatchDetail';
@@ -60,36 +60,19 @@ function route(path: string): ReactNode {
   );
 }
 
-const ping = () => api.get('/api/me').then(() => invalidate('/api/'), () => {});
-
-/** SPEC §8.5: a large banner when the server can't be reached. */
-function OfflineBanner() {
-  const reachable = useReachable();
-  useEffect(() => {
-    const onVisible = () => document.visibilityState === 'visible' && void ping();
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
-  if (reachable) return null;
-  return (
-    <div
-      role="alert"
-      className="sticky top-0 z-40 flex items-center gap-3 bg-warn px-4 pb-3 text-lg font-semibold text-black"
-      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-    >
-      <p className="flex-1">{t('app.offline')}</p>
-      <Button variant="outline" className="border-black/40 bg-transparent text-black" onClick={() => void ping()}>
-        {t('app.retry')}
-      </Button>
-    </div>
-  );
+/** A queued write the server turned down once it was back, e.g. a batch number taken meanwhile. */
+function RefusedWrites() {
+  const toast = useToast();
+  useEffect(() => onRefused((_op, error) => toast.error(t('sync.refused', { error: error.message }))), [toast]);
+  return null;
 }
 
 export function App() {
   const path = usePath();
+  usePingOnVisible();
   return (
     <ToastProvider>
-      <OfflineBanner />
+      <RefusedWrites />
       {route(path)}
     </ToastProvider>
   );

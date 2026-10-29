@@ -6,6 +6,10 @@ const en = {
   'app.offline': 'Can’t reach the server — is Tailscale on?',
   'app.retry': 'Retry',
   'app.notFound': 'Nothing here.',
+  'app.notCached': 'Not available until the server is back.',
+  'sync.waiting': 'Waiting to sync: {n}',
+  'sync.syncing': 'Syncing: {n}',
+  'sync.refused': 'A queued change was refused: {error}',
 
   'common.back': 'Back',
   'common.done': 'Done',

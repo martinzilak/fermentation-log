@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, parseDecimal } from '@/lib/numbers';
-import { invalidate, useQuery } from '@/lib/query';
+import { invalidate, missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import { readLocal, writeLocal } from '@/lib/storage';
 import type { BatchView, BottleType, Fill } from '@/lib/types';
@@ -84,7 +84,7 @@ export function Bottling({ id }: { id: string }) {
   if (!batch) {
     return (
       <Screen
-        title={error ? t('app.notFound') : t('common.loading')}
+        title={missingTitle(error)}
         footer={
           <Button variant="outline" onClick={() => goBack(`/b/${id}`)}>
             {t('common.back')}

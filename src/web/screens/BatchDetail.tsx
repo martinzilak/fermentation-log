@@ -11,7 +11,7 @@ import { dayNumber, formatDay, formatStamp, stars } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
-import { useQuery } from '@/lib/query';
+import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import type { Attachment, BatchView, BottleType, EventView, Fill, StepView, Vessel } from '@/lib/types';
 
@@ -26,7 +26,7 @@ export function BatchDetail({ id }: { id: string }) {
   if (!batch) {
     return (
       <Screen
-        title={error ? t('app.notFound') : t('common.loading')}
+        title={missingTitle(error)}
         footer={
           <Button variant="outline" onClick={() => goBack('/')}>
             {t('detail.batches')}
