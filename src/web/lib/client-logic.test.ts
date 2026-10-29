@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appendKey, formatShuRange, parseDecimal } from './numbers.ts';
 import { phLevel, phText } from './ph.ts';
-import { suggest, varietyFor, type Sources } from './suggest.ts';
+import { cleanName, IDLE_LIMIT, SEARCH_LIMIT, suggest, varietyFor, type Sources } from './suggest.ts';
 
 const type = (keys: string, opts?: { decimals?: number; maxInt?: number }) =>
   [...keys].reduce((value, key) => appendKey(value, key === '<' ? 'back' : key, opts), '');
@@ -52,8 +52,10 @@ describe('heat range text', () => {
 const VINEGAR = 'Ocot kvasný liehový 8 %';
 const sources: Sources = {
   recent: [
-    { name: 'Cesnak', kind: 'aromatic', local_name: null, catalog_id: null, variety_id: null },
-    { name: 'Sparkler', kind: 'pepper', local_name: 'špicaté', catalog_id: null, variety_id: 'v-sparkler' },
+    { name: 'Cesnak', kind: 'aromatic', catalog_id: null, variety_id: null, step_types: ['blend'] },
+    { name: 'Soľ', kind: 'salt', catalog_id: null, variety_id: null, step_types: ['ferment'] },
+    { name: 'Sparkler', kind: 'pepper', catalog_id: null, variety_id: 'v-sparkler', step_types: ['ferment'] },
+    { name: VINEGAR, kind: 'acid', catalog_id: 'c-vinegar', variety_id: null, step_types: ['blend'] },
   ],
   catalog: [{ id: 'c-vinegar', name: VINEGAR, kind: 'acid', aliases: ['ocot'] }],
   varieties: [
@@ -61,26 +63,52 @@ const sources: Sources = {
     { id: 'v-habanero', name: 'Habanero Yellow', species: null, local_names: [], shu_min: null, shu_max: null },
   ],
 };
+const names = (query: string, stepType?: 'ferment' | 'blend') => suggest(query, sources, stepType).options.map((s) => s.name);
 
 describe('ingredient suggestions', () => {
-  it('lists recent names first, then catalog items and varieties, without duplicates', () => {
-    expect(suggest('', sources).map((s) => s.name)).toEqual(['Cesnak', 'Sparkler', VINEGAR, 'Habanero Yellow']);
+  it('offers the names this step type usually takes first, once each', () => {
+    expect(names('', 'ferment')).toEqual(['Soľ', 'Sparkler', 'Cesnak', VINEGAR, 'Habanero Yellow']);
+    expect(names('', 'blend')).toEqual(['Cesnak', VINEGAR, 'Soľ', 'Sparkler', 'Habanero Yellow']);
+  });
+
+  it('shows only a few chips before anything is typed', () => {
+    const many: Sources = {
+      ...sources,
+      recent: Array.from({ length: 30 }, (_, i) => ({ name: `Item ${i}`, kind: 'other' as const, catalog_id: null, variety_id: null, step_types: [] })),
+    };
+    expect(suggest('', many).options).toHaveLength(IDLE_LIMIT);
+    expect(suggest('item', many).options).toHaveLength(SEARCH_LIMIT);
+  });
+
+  it('ignores case and accents, and knows when the name already exists', () => {
+    expect(names('sol')).toEqual(['Soľ']);
+    expect(suggest('SOĽ', sources).exact).toBe(true);
+    expect(suggest('so', sources).exact).toBe(false);
+  });
+
+  it('matches the kind as well as the name', () => {
+    expect(names('salt')).toEqual(['Soľ']);
+    expect(names('pepper')).toEqual(['Sparkler', 'Habanero Yellow']);
   });
 
   it('resolves a typed alias to the canonical name and keeps the original in the note', () => {
-    const [hit] = suggest('Ocot', sources);
-    expect(hit).toMatchObject({ name: VINEGAR, kind: 'acid', catalog_id: 'c-vinegar', note: "recorded as 'Ocot'" });
-    expect(suggest('kvas', sources)[0]).toMatchObject({ name: VINEGAR, note: null });
+    const { options, exact } = suggest('Ocot', sources);
+    expect(exact).toBe(true);
+    expect(options[0]).toMatchObject({ name: VINEGAR, kind: 'acid', catalog_id: 'c-vinegar', note: "recorded as 'Ocot'" });
+    expect(suggest('kvas', sources).options[0]).toMatchObject({ name: VINEGAR, note: null });
   });
 
-  it('matches variety local names and records the one typed', () => {
-    expect(suggest('špicaté', sources)[0]).toMatchObject({ name: 'Sparkler', local_name: 'špicaté', variety_id: 'v-sparkler' });
-    expect(varietyFor('ŠPICATÉ', sources.varieties)?.id).toBe('v-sparkler');
-    expect(varietyFor('Carolina Reaper', sources.varieties)).toBeUndefined();
+  it('puts exact and prefix matches before matches inside a name', () => {
+    expect(names('h')).toEqual(['Habanero Yellow', VINEGAR]);
   });
 
-  it('puts prefix matches before matches inside the name', () => {
-    expect(suggest('ha', sources).map((s) => s.name)).toEqual(['Habanero Yellow']);
-    expect(suggest('h', sources).map((s) => s.name)).toEqual(['Habanero Yellow', VINEGAR]);
+  it('finds a variety by name regardless of case and accents', () => {
+    expect(varietyFor('sparkler', sources.varieties)?.id).toBe('v-sparkler');
+    expect(varietyFor('špicaté', sources.varieties)).toBeUndefined();
+  });
+
+  it('tidies a new name: single spaces and a capital first letter', () => {
+    expect(cleanName('  voda   z  vodovodu ')).toBe('Voda z vodovodu');
+    expect(cleanName('ľutovka')).toBe('Ľutovka');
   });
 });

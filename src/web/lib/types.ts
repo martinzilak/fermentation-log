@@ -112,9 +112,9 @@ export interface BottleType {
 export interface RecentLine {
   name: string;
   kind: Kind;
-  local_name: string | null;
   catalog_id: string | null;
   variety_id: string | null;
+  step_types: StepType[];
 }
 
 export interface Settings {

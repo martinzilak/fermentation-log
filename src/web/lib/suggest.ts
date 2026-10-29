@@ -1,7 +1,11 @@
-// Ingredient chips (SPEC §8.1 item 12): recent names first, then catalog
-// items and varieties. Catalog aliases resolve to the canonical name and keep
-// what was typed in the note (SPEC §6.2); variety local names fill local_name.
-import type { Kind } from '../../shared/schemas.ts';
+// Ingredient chips (SPEC §8.1 item 12). Names compare without case or
+// accents, so "sol" finds "Soľ" and typing an existing name never creates a
+// second spelling of it. A search also matches the kind ("salt") and catalog
+// aliases; an alias resolves to the canonical name and keeps what was typed
+// in the note (SPEC §6.2). Before anything is typed, only a few chips show:
+// the names this kind of step usually takes, most recent first.
+import type { Kind, StepType } from '../../shared/schemas.ts';
+import { kindLabel } from './i18n.ts';
 import type { CatalogItem, RecentLine, Variety } from './types.ts';
 
 export interface Pick {
@@ -9,7 +13,6 @@ export interface Pick {
   kind: Kind | null;
   catalog_id: string | null;
   variety_id: string | null;
-  local_name: string | null;
   note: string | null;
 }
 
@@ -19,75 +22,81 @@ export interface Sources {
   varieties: Variety[];
 }
 
-interface Candidate extends Pick {
-  terms: string[];
+export const IDLE_LIMIT = 8;
+export const SEARCH_LIMIT = 12;
+
+/** Case- and accent-insensitive form of a name: "Soľ" and "sol" are the same. */
+export const fold = (s: string) =>
+  s.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+
+/** A typed new name, tidied: single spaces and a capital first letter ("voda" → "Voda"). */
+export function cleanName(s: string): string {
+  const name = s.replace(/\s+/g, ' ').trim();
+  return name.charAt(0).toLocaleUpperCase() + name.slice(1);
+}
+
+interface Candidate {
+  pick: Pick;
   aliases: string[];
 }
 
-const lower = (s: string) => s.toLocaleLowerCase();
-
-export function suggest(query: string, { recent, catalog, varieties }: Sources, limit = 15): Pick[] {
-  const q = lower(query.trim());
-  const candidates: Candidate[] = [
-    ...recent.map((r) => ({
-      name: r.name,
-      kind: r.kind,
-      catalog_id: r.catalog_id,
-      variety_id: r.variety_id,
-      local_name: r.local_name,
-      note: null,
-      terms: [r.name, ...(r.local_name ? [r.local_name] : [])],
-      aliases: [],
+function candidates({ recent, catalog, varieties }: Sources, stepType: StepType | undefined): Candidate[] {
+  const aliasesOf = new Map(catalog.map((c) => [c.id, c.aliases]));
+  const usual = stepType ? recent.filter((r) => r.step_types.includes(stepType)) : recent;
+  const other = stepType ? recent.filter((r) => !r.step_types.includes(stepType)) : [];
+  return [
+    ...[...usual, ...other].map((r) => ({
+      pick: { name: r.name, kind: r.kind, catalog_id: r.catalog_id, variety_id: r.variety_id, note: null },
+      aliases: (r.catalog_id && aliasesOf.get(r.catalog_id)) || [],
     })),
     ...catalog.map((c) => ({
-      name: c.name,
-      kind: c.kind,
-      catalog_id: c.id,
-      variety_id: null,
-      local_name: null,
-      note: null,
-      terms: [c.name, ...c.aliases],
+      pick: { name: c.name, kind: c.kind, catalog_id: c.id, variety_id: null, note: null },
       aliases: c.aliases,
     })),
     ...varieties.map((v) => ({
-      name: v.name,
-      kind: 'pepper' as const,
-      catalog_id: null,
-      variety_id: v.id,
-      local_name: null,
-      note: null,
-      terms: [v.name, ...v.local_names],
+      pick: { name: v.name, kind: 'pepper' as const, catalog_id: null, variety_id: v.id, note: null },
       aliases: [],
     })),
   ];
-
-  const seen = new Set<string>();
-  const starts: Pick[] = [];
-  const contains: Pick[] = [];
-  for (const { terms, aliases, ...pick } of candidates) {
-    const key = `${lower(pick.name)}|${pick.kind}`;
-    if (seen.has(key)) continue;
-    // The term that matched: exact beats prefix beats anywhere in the name.
-    const hit = q
-      ? (terms.find((term) => lower(term) === q) ??
-        terms.find((term) => lower(term).startsWith(q)) ??
-        terms.find((term) => lower(term).includes(q)))
-      : pick.name;
-    if (hit === undefined) continue;
-    seen.add(key);
-    const exact = q !== '' && lower(hit) === q && lower(hit) !== lower(pick.name);
-    const resolved: Pick = {
-      ...pick,
-      ...(exact && aliases.some((a) => lower(a) === q) ? { note: `recorded as '${query.trim()}'` } : {}),
-      ...(exact && pick.variety_id ? { local_name: hit } : {}),
-    };
-    (q && lower(hit).startsWith(q) ? starts : contains).push(resolved);
-  }
-  return [...starts, ...contains].slice(0, limit);
 }
 
-/** The variety a pepper name refers to, by name or local name. */
+export interface Suggestions {
+  options: Pick[];
+  /** The query already names an ingredient (by name or alias), so no new one is offered. */
+  exact: boolean;
+}
+
+export function suggest(query: string, sources: Sources, stepType?: StepType): Suggestions {
+  const q = fold(query);
+  const seen = new Set<string>();
+  // Ranked buckets: exact name or alias, then prefix, then anywhere.
+  const ranked: [Pick[], Pick[], Pick[]] = [[], [], []];
+  for (const { pick, aliases } of candidates(sources, stepType)) {
+    const key = `${fold(pick.name)}|${pick.kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!q) {
+      ranked[2].push(pick);
+      continue;
+    }
+    const name = fold(pick.name);
+    const alias = aliases.find((a) => fold(a) === q);
+    if (name === q || alias) {
+      ranked[0].push(alias ? { ...pick, note: `recorded as '${query.trim()}'` } : pick);
+      continue;
+    }
+    const terms = [name, ...aliases.map(fold), ...(pick.kind ? [fold(kindLabel(pick.kind))] : [])];
+    if (terms.some((term) => term.startsWith(q))) ranked[1].push(pick);
+    else if (terms.some((term) => term.includes(q))) ranked[2].push(pick);
+  }
+  return {
+    options: ranked.flat().slice(0, q ? SEARCH_LIMIT : IDLE_LIMIT),
+    exact: ranked[0].length > 0,
+  };
+}
+
+/** The variety a pepper name refers to, ignoring case and accents. */
 export function varietyFor(name: string, varieties: Variety[]): Variety | undefined {
-  const n = lower(name.trim());
-  return varieties.find((v) => lower(v.name) === n || v.local_names.some((l) => lower(l) === n));
+  const n = fold(name);
+  return varieties.find((v) => fold(v.name) === n);
 }

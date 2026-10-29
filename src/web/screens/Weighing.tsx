@@ -16,7 +16,7 @@ import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
-import { suggest, varietyFor, type Pick } from '@/lib/suggest';
+import { cleanName, suggest, varietyFor, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety, Vessel } from '@/lib/types';
 
 type Chosen = Pick & { kind: Kind; lot_id: string | null };
@@ -159,7 +159,6 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         grams,
         lot_id: pick.lot_id,
         catalog_id: pick.catalog_id,
-        local_name: pick.local_name,
         note: pick.note,
       }),
     );
@@ -206,7 +205,6 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         <Screen
           title={t('weigh.tareTitle')}
           subtitle={subtitle}
-          fixed
           footer={
             typing && newVessel?.trim() ? (
               <Button size="lg" onClick={() => void addVessel(newVessel.trim())}>
@@ -250,22 +248,20 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
       const { vessel } = stage;
       const next = () => typed !== null && void saveTare(vessel, round2(typed));
       return (
-        <Screen title={t('weigh.emptyWeight')} subtitle={`${subtitle} · ${vessel.name}`} fixed footer={numpadFooter(() => go({ name: 'vessel' }), next)}>
+        <Screen title={t('weigh.emptyWeight')} subtitle={`${subtitle} · ${vessel.name}`} footer={numpadFooter(() => go({ name: 'vessel' }), next)}>
           <Readout value={value} unit="g" />
         </Screen>
       );
     }
 
     case 'pick': {
-      const options = suggest(query, { recent, catalog, varieties });
-      const q = query.trim();
-      const exact = options.some((o) => o.name.toLocaleLowerCase() === q.toLocaleLowerCase());
+      const { options, exact } = suggest(query, { recent, catalog, varieties }, step.type);
+      const q = cleanName(query);
       const added = [...step.lines].reverse();
       return (
         <Screen
           title={t('weigh.whatNext')}
           subtitle={subtitle}
-          fixed
           footer={
             <Button size="lg" onClick={leave}>
               {t('common.done')}
@@ -282,12 +278,12 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           />
           <Chips>
             {q && !exact && (
-              <Chip onClick={() => choose({ name: q, kind: null, catalog_id: null, variety_id: null, local_name: null, note: null })}>
+              <Chip onClick={() => choose({ name: q, kind: null, catalog_id: null, variety_id: null, note: null })}>
                 {t('weigh.useName', { name: q })}
               </Chip>
             )}
             {options.map((o) => (
-              <Chip key={`${o.name}|${o.kind}`} hint={o.local_name ?? kindHint(o)} onClick={() => choose(o)}>
+              <Chip key={`${o.name}|${o.kind}`} hint={kindHint(o)} onClick={() => choose(o)}>
                 {o.name}
               </Chip>
             ))}
@@ -315,7 +311,6 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         <Screen
           title={t('weigh.whatKind', { name: pick.name })}
           subtitle={subtitle}
-          fixed
           footer={
             <Button variant="outline" onClick={() => go({ name: 'pick' })}>
               {t('common.back')}
@@ -339,7 +334,6 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         <Screen
           title={t('weigh.whichLot', { name: pick.name })}
           subtitle={subtitle}
-          fixed
           footer={
             <Button variant="outline" onClick={() => go({ name: 'pick' })}>
               {t('common.back')}
@@ -366,13 +360,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         // The name sits in the header so the keypad can never push it off screen.
         <Screen
           title={<span className="text-[48px] leading-[1.1] break-words">{pick.name}</span>}
-          subtitle={
-            <>
-              {pick.local_name && <p className="text-2xl">{pick.local_name}</p>}
-              <p>{liveStats(pending, true)}</p>
-            </>
-          }
-          fixed
+          subtitle={liveStats(pending, true)}
           footer={numpadFooter(() => go({ name: 'pick' }), () => void nextFromGrams(pick))}
         >
           <Readout value={value} unit="g" />
@@ -399,7 +387,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         go({ name: 'grams', pick });
       };
       return (
-        <Screen title={t('weigh.containerTitle')} subtitle={subtitle} fixed footer={numpadFooter(() => go({ name: 'grams', pick }), next)}>
+        <Screen title={t('weigh.containerTitle')} subtitle={subtitle} footer={numpadFooter(() => go({ name: 'grams', pick }), next)}>
           <Readout value={value} unit="g" />
         </Screen>
       );

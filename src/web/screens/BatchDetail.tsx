@@ -188,10 +188,7 @@ function StepCard({ step, vessels, onAdd }: { step: StepView; vessels: Vessel[];
         <ul className="mt-2 divide-y border-t">
           {step.lines.map((l) => (
             <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
-              <span>
-                {l.name}
-                {l.local_name && <span className="text-muted-foreground"> ({l.local_name})</span>}
-              </span>
+              <span>{l.name}</span>
               <span className="shrink-0 tabular-nums">{l.grams === null ? '—' : formatGrams(l.grams)}</span>
             </li>
           ))}
