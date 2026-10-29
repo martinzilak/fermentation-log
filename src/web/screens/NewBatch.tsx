@@ -1,9 +1,9 @@
 // New batch, blank (SPEC §8.2 item 2): number and start date, then straight
 // into weighing mode. The batch and its ferment step are saved on Start, so
-// leaving the weighing flow later loses nothing.
+// leaving the weighing flow later loses nothing. The colour (of the caps or
+// labels) is chosen at bottling (SPEC §15.5).
 import { Minus, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { ColorChips } from '@/components/ColorChips';
 import { DatePick } from '@/components/DatePick';
 import { ActionRow, Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
@@ -23,7 +23,6 @@ export function NewBatch() {
   const next = (batches ?? []).reduce((max, b) => Math.max(max, b.number), 0) + 1;
   const [number, setNumber] = useState<number | null>(null);
   const [date, setDate] = useState(todayIso());
-  const [color, setColor] = useState<string | null>(null);
   const shown = number ?? next;
   // Fixed for this screen, so a retry after a half-finished save reuses them.
   const ids = useRef({ batch: crypto.randomUUID(), step: crypto.randomUUID() }).current;
@@ -31,7 +30,7 @@ export function NewBatch() {
   async function start() {
     const { batch: batchId, step: stepId } = ids;
     const created = await toast.run(async () => {
-      await api.post('/api/batches', { id: batchId, number: shown, color });
+      await api.post('/api/batches', { id: batchId, number: shown });
       await api.post(`/api/batches/${batchId}/steps`, { id: stepId, type: 'ferment', date, params: {} });
       return true;
     });
@@ -75,10 +74,6 @@ export function NewBatch() {
         <div>
           <h2 className="mb-2 text-lg text-muted-foreground">{t('new.date')}</h2>
           <DatePick value={date} onChange={setDate} />
-        </div>
-        <div>
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('new.color')}</h2>
-          <ColorChips value={color} onChange={setColor} />
         </div>
       </section>
     </Screen>

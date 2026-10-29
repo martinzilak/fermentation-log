@@ -5,6 +5,11 @@ import { t } from '@/lib/i18n';
 
 export const COLORS = ['red', 'orange', 'yellow', 'green', 'brown', 'purple'] as const;
 
+/** The colour's name; an imported colour outside the six is shown as written. */
+export function colorName(color: string): string {
+  return (COLORS as readonly string[]).includes(color) ? t(`color.${color as (typeof COLORS)[number]}`) : color;
+}
+
 export function ColorChips({ value, onChange }: { value: string | null; onChange: (color: string | null) => void }) {
   return (
     <Chips>

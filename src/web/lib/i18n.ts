@@ -218,6 +218,8 @@ const en = {
   'bottle.labelHint': 'Jam jar, gift…',
   'bottle.skip': 'Skip',
   'bottle.volume': '{ml} ml bottled',
+  'bottle.colorTitle': 'Colour of the caps or labels',
+  'bottle.colorHint': 'Marks this batch in the list',
   'bottle.phTitle': 'pH of the sauce',
   'bottle.notMeasured': 'Not measured',
   'bottle.whyNot': 'Why wasn’t it measured?',

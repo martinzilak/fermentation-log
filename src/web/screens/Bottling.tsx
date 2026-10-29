@@ -1,14 +1,16 @@
 // Bottling checklist (SPEC §8.2 item 4, §15.2), one thing per screen:
 // confirm the additions are all in, the fills (saved bottle types or one-off
-// bottles), pH or why it wasn't measured, at least one photo, then the
-// optional leftover and measured total. Saving creates the `bottled` event.
+// bottles), the batch colour (of the caps or labels, SPEC §15.5), pH or why
+// it wasn't measured, at least one photo, then the optional leftover and
+// measured total. Saving creates the `bottled` event and sets the colour.
 // The answers are kept on the device as they are given, so leaving half-way
 // loses nothing (SPEC §8.1 item 13).
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { bottledVolumeMl } from '../../shared/calc.ts';
 import { Chip, Chips } from '@/components/Chip';
-import { PhLabel } from '@/components/Labels';
+import { ColorChips, colorName } from '@/components/ColorChips';
+import { ColorDot, PhLabel } from '@/components/Labels';
 import { NumpadFooter, Readout } from '@/components/Numpad';
 import { PhotoButton } from '@/components/PhotoButton';
 import { ActionRow, Screen } from '@/components/Screen';
@@ -28,6 +30,8 @@ import { fillName } from '@/screens/BatchDetail';
 interface Draft {
   confirmed: boolean;
   fills: Fill[];
+  /** The batch colour chosen here; undefined until that screen is passed. */
+  color?: string | null;
   ph: number | null;
   phReason: string | null;
   /** Photo events taken in this flow. */
@@ -48,6 +52,7 @@ type Stage =
   | { name: 'label'; index: number }
   | { name: 'newTypeName' }
   | { name: 'newTypeVolume'; typeName: string }
+  | { name: 'color' }
   | { name: 'ph' }
   | { name: 'phReason' }
   | { name: 'photo' }
@@ -68,6 +73,7 @@ function readDraft(key: string): Draft {
 function resume(d: Draft): Stage {
   if (!d.confirmed) return { name: 'check' };
   if (d.fills.length === 0) return { name: 'fills' };
+  if (d.color === undefined) return { name: 'color' };
   if (d.ph === null && !d.phReason) return { name: 'ph' };
   if (d.photos.length === 0) return { name: 'photo' };
   return { name: 'review' };
@@ -139,12 +145,19 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
       leftover_g: draft.leftover_g,
       total_g: draft.total_g,
     };
-    if (!(await toast.run(() => api.post(`/api/batches/${batch.id}/events`, { id: eventId, type: 'bottled', payload })))) return;
+    const color = draft.color === undefined ? batch.color : draft.color;
+    const colorBefore = batch.color;
+    const saved = await toast.run(async () => {
+      if (color !== colorBefore) await api.patch(`/api/batches/${batch.id}`, { color });
+      return api.post(`/api/batches/${batch.id}/events`, { id: eventId, type: 'bottled', payload });
+    });
+    if (!saved) return;
     writeLocal(key, null);
     invalidate('/api/batches');
     goBack(detail);
     toast.show(t('bottle.saved', { n: batch.number }), async () => {
       await api.del(`/api/events/${eventId}`);
+      if (color !== colorBefore) await api.patch(`/api/batches/${batch.id}`, { color: colorBefore });
       writeLocal(key, JSON.stringify(draft));
       invalidate('/api/batches');
     });
@@ -191,7 +204,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
           footer={
             <ActionRow>
               {back(() => go({ name: 'check' }))}
-              <Button size="lg" disabled={draft.fills.length === 0} onClick={() => go(draft.ph === null && !draft.phReason ? { name: 'ph' } : resume(draft))}>
+              <Button size="lg" disabled={draft.fills.length === 0} onClick={() => go({ name: 'color' })}>
                 {t('common.next')}
               </Button>
             </ActionRow>
@@ -308,6 +321,33 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
       );
     }
 
+    case 'color': {
+      const color = draft.color === undefined ? batch.color : draft.color;
+      return (
+        <Screen
+          title={t('bottle.colorTitle')}
+          subtitle={t('bottle.colorHint')}
+          footer={
+            <ActionRow>
+              {back(() => go({ name: 'fills' }))}
+              <Button
+                size="lg"
+                onClick={() => {
+                  const d = { ...draft, color };
+                  update(d);
+                  go(d.ph === null && !d.phReason ? { name: 'ph' } : resume(d));
+                }}
+              >
+                {t('common.next')}
+              </Button>
+            </ActionRow>
+          }
+        >
+          <ColorChips value={color} onChange={(c) => update({ color: c })} />
+        </Screen>
+      );
+    }
+
     case 'ph': {
       const next = () => {
         if (typed === null) return;
@@ -317,7 +357,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
         go(d.photos.length === 0 ? { name: 'photo' } : resume(d));
       };
       return (
-        <Screen title={t('bottle.phTitle')} subtitle={subtitle} footer={numpad(() => go({ name: 'fills' }), next, { maxInt: 2 })}>
+        <Screen title={t('bottle.phTitle')} subtitle={subtitle} footer={numpad(() => go({ name: 'color' }), next, { maxInt: 2 })}>
           <Chips>
             <Chip onClick={() => go({ name: 'phReason' })}>{t('bottle.notMeasured')}</Chip>
             <Chip onClick={() => navigate('/ph-info')}>{t('ph.whatMeans')}</Chip>
@@ -463,6 +503,11 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
               </p>
             ) : (
               draft.phReason && <p>{t('bottle.phNotMeasured', { reason: draft.phReason })}</p>
+            )}
+            {draft.color && (
+              <p className="flex items-center gap-2">
+                <ColorDot color={draft.color} /> {colorName(draft.color)}
+              </p>
             )}
             <p>{t('bottle.photos', { n: photos.length })}</p>
             {draft.leftover_g !== null && <p>{t('bottle.leftoverG', { g: formatGrams(draft.leftover_g) })}</p>}

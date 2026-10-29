@@ -630,3 +630,7 @@ Where this section conflicts with an earlier one, this section wins.
 - **Merging has no Undo.** It's the one edit that can't be taken back with a tap. The edit screen asks for the entry to keep and then a separate "Merge into …" tap.
 - **Bottling photos** are ordinary `photo` events taken during the checklist; the `bottled` event itself has no attachments.
 - **Alias notes.** Weighing mode still writes "recorded as '…'" in the note when a name is picked through an alias. The importer doesn't, because the seed files keep the original names.
+
+### 15.5 From the M2b test
+
+- **Batch colour at bottling.** The colour marks the caps or labels, so it is chosen in the bottling checklist, right after the bottles, rather than when the batch is started (§8.2 item 2). The edit screen can still change it.
