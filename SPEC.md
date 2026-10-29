@@ -1,0 +1,563 @@
+# Fermentation Log — Spec
+
+A small self-hosted PWA for logging fermented chilli sauce batches from an iPhone, at the jar and at the stove, usually with dirty or wet hands. It replaces a paper notebook. Data must stay exportable as plain files.
+
+Read this whole file before writing code. Work milestone by milestone (§11). Ask the owner before deviating from a decision marked **Decided**.
+
+---
+
+## 1. Goals and non-goals
+
+**Goals**
+- Log a batch end to end on a phone: ingredients per processing step, timeline events, photos, voice notes, pH, bottling.
+- Be usable with chilli-covered, wet or gloved hands (§8.1 is a hard requirement, not polish).
+- Catch the fields the paper log keeps missing (pH, xanthan, vinegar type, bottle counts) with a bottling checklist.
+- Compute derived values (salt %, durations, xanthan %, heat estimate) instead of typing them.
+- Recipes with goals: fix the pepper amounts you have, and the app computes the rest from ratios and targets (§7.3).
+- Export everything to Markdown + YAML frontmatter (one file per batch) and JSON. Plain files must outlive the app.
+
+**Non-goals (v1)**
+- No public internet exposure. Tailscale only.
+- No Bluetooth devices (scales, pH meters).
+- No Home Assistant integration yet. There is no temperature sensor near the ferment; leave a seam for it, nothing more.
+- No multi-tenant or user management UI. Two or so trusted users, identified by Tailscale.
+- No audio transcription.
+
+## 2. Users and devices
+
+- Primary: the owner, on iOS (iPhone), using the app installed to the Home Screen (standalone mode).
+- Secondary: one more person who ferments with him, also via Tailscale.
+- Desktop browser use is occasional (review, recipes, export). It must work but is not the design target.
+
+## 3. Hosting and access — **Decided**
+
+- **Platform:** Unraid 7, one Docker container built from this repo's Dockerfile.
+- **Network access:** Unraid's built-in per-container **"Use Tailscale"** toggle with **Tailscale Serve** enabled. The app gets its own tailnet name, e.g. `https://ferment.<tailnet>.ts.net`, with an HTTPS certificate handled by Tailscale.
+- **No host port mapping.** The app must not be reachable from the LAN. A LAN port would let any LAN device forge the identity headers (§4), and plain `http://<ip>:port` is not a secure context, so the PWA features wouldn't work there anyway.
+- **Bind address:** `127.0.0.1:${PORT}` inside the container, so only Serve can reach it.
+- **Defence in depth:** the server trusts identity headers only when the TCP peer address is loopback. Any other peer gets `403`, except `GET /healthz`. This keeps auth safe even if someone later changes `BIND_HOST` or adds a port mapping.
+- **Persistent data:** a single volume, `/data` in the container, mapped to `/mnt/user/appdata/ferment-log/` on the host. It holds:
+  - `ferment.db` (SQLite, WAL mode)
+  - `media/` (photos and voice notes)
+  - `exports/` (nightly export, §10)
+  - `backups/` (nightly `VACUUM INTO` snapshot, so the host's Appdata Backup job copies a consistent file)
+- **Outbound internet:** needed only for Web Push in M6 (HTTPS to `*.push.apple.com`).
+
+### 3.1 Milestone 0 must verify (deployment spike)
+
+Unraid's documentation says the Tailscale integration does not work with every container. Before building features, ship a hello-world image and confirm all of these:
+
+1. `https://ferment.<tailnet>.ts.net` loads from the iPhone over Tailscale.
+2. `GET /api/me` returns the `Tailscale-User-Login` value Serve injects.
+3. With the server bound to `127.0.0.1`, Serve still reaches it (i.e. Serve runs in the container's network namespace), and the peer address the server sees is loopback.
+4. The app is **not** reachable from the LAN or the Docker bridge IP.
+5. Record (don't fix): with Tailscale switched off and VPN On Demand configured for `*.ts.net`, does opening the Home Screen app bring Tailscale up?
+
+**Fallback** if check 3 or 4 fails: a Docker Compose stack with the official `tailscale/tailscale` image as a sidecar (`TS_SERVE_CONFIG` pointing to a `serve.json`, app container using `network_mode: service:tailscale`). Document whichever path works in the README.
+
+### 3.2 iOS notes for the README
+
+- Recommend enabling Tailscale's **VPN On Demand** on the iPhone with the rule that connects automatically for `*.ts.net` hostnames.
+- Install the app via Safari → Share → Add to Home Screen.
+
+## 4. Authentication — **Decided**
+
+- Trust the `Tailscale-User-Login` and `Tailscale-User-Name` headers set by Serve (only from a loopback peer, §3). Serve strips client-supplied copies of these headers.
+- `ALLOWED_LOGINS` env var: comma-separated list of logins. A request with a missing or non-allowed login gets `403` with a short plain-text explanation.
+- Tailscale does not populate identity headers for traffic from **tagged** client devices. If a phone gets 403 with no header, the README should mention this as the first thing to check.
+- **Dev mode:** `DEV_USER=<login>` makes the server act as that user without headers, from any peer. The server must refuse to start if `DEV_USER` is set while `NODE_ENV=production`.
+- Every write records `author` (the login) and `created_at`.
+
+## 5. Tech stack — **Decided** (versions: use current stable releases)
+
+- **Language:** TypeScript, `strict` on, end to end.
+- **Runtime:** current Node.js LTS. Base image: a slim Debian Node image (alpine only if M0 shows it works with Unraid's Tailscale injection).
+- **Server:** Hono on `@hono/node-server`. It serves both the API and the built PWA.
+- **Database:** SQLite via `better-sqlite3`, plain SQL, numbered migration files in `migrations/` with a tiny runner. No ORM.
+- **Validation:** `valibot` schemas in `src/shared`, used by both client and server. On the server, validate requests with `@hono/standard-validator` (or `@hono/valibot-validator`).
+- **Client:** Vite + React + TypeScript.
+  - **UI:** Tailwind CSS v4 + **shadcn/ui** (Radix-based components generated into `src/web/components/ui`, so they are owned and editable). Follow the official Vite install guide at ui.shadcn.com.
+  - shadcn defaults are desktop-sized. Override sizes globally to meet §8.1; don't scatter one-off overrides.
+  - `vite-plugin-pwa` for the manifest and service worker.
+  - Icons: `lucide-react` (comes with shadcn).
+- **Tests:** `vitest`, for derived calculations, recipe maths, import/export round-trip and API handlers.
+- **Package layout:** a single package with `src/server`, `src/web` and `src/shared`. No monorepo tooling.
+
+### Environment variables
+
+| Var | Purpose | Default |
+|---|---|---|
+| `PORT` | Server port inside the container | `3000` |
+| `BIND_HOST` | Listen address | `127.0.0.1` |
+| `DATA_DIR` | Data root | `/data` |
+| `ALLOWED_LOGINS` | Comma-separated Tailscale logins | *(required in production)* |
+| `DEV_USER` | Dev-only fake login | unset |
+| `TZ` | Timezone for dates and schedules | `Europe/Bratislava` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (M6) | unset |
+
+## 6. Domain model
+
+All IDs are **client-generated UUIDs**, so the offline outbox (§8.5) can replay writes idempotently. Weights are grams (`REAL`). Dates are ISO 8601; timestamps are stored in UTC and shown in local time.
+
+### 6.1 Core idea: a batch is an ordered list of steps
+
+A batch is not "ferment + blend". It is a sequence of **steps**, each with its own additions. This covers real-world variations such as blending before *and* after cooking, straining, or adding xanthan only at the end:
+
+```
+ferment → blend → cook → blend → bottle
+ferment → blend → strain → cook → bottle
+```
+
+### 6.2 Tables
+
+**`batches`**
+- `id`
+- `number`: INTEGER UNIQUE, the human batch number (#1, #2, …)
+- `name`: optional
+- `color`: optional free text
+- `status`: `planned | fermenting | processing | bottled | archived`
+- `recipe_id`: optional FK
+- `notes_md`: free-form Markdown body
+- `created_at`, `updated_at`, `author`
+
+**`steps`**
+- `id`, `batch_id`, `position`
+- `type`: `ferment | blend | cook | strain | rest | other`
+- `date`: nullable
+- `params`: JSON, typed per `type`:
+  - `ferment`: `{ vessel_id?, vessel_tare_g }` (the tare is required for new batches and optional for imported ones)
+  - `cook`: `{ temp_c?, minutes? }`
+  - `strain`: `{ removed_g? }`
+  - others: `{}`
+- `note`: optional
+
+**`ingredient_lines`** (additions to a step)
+- `id`, `batch_id`, `step_id`, `position`
+- `name`: free text, any language (Slovak is common)
+- `local_name`: optional nickname, e.g. "tučné"
+- `kind`: `pepper | vegetable | fruit | aromatic | herb | water | salt | mash | brine | acid | sweetener | thickener | other`
+- `grams`: actual weighed amount (nullable while planned)
+- `planned_g`: snapshot from the recipe at batch creation (nullable)
+- `lot_id`: optional FK to `pepper_lots` (peppers only)
+- `catalog_id`: optional FK to `catalog_items` (non-pepper ingredients)
+- `shu_min`, `shu_max`: optional per-line override. A single legacy value is stored as `min = max`.
+- `shu_source`: optional URL or `legacy-log`
+- `note`: optional
+
+**`varieties`** (pepper cultivars, editable in the app)
+- `id`, `name`, `species` (e.g. *C. annuum*, *C. chinense*), `local_names` (JSON array)
+- `shu_min`, `shu_max`: either may be null if only one bound is known
+- `shu_source`, `notes`
+
+**`pepper_lots`** (where a given year's peppers came from)
+- `id`, `variety_id`
+- `season`: year
+- `origin`: `grown | bought | gift`
+- `propagation`: `seed | sapling` (only when `origin = grown`)
+- `supplier`: free text or URL (seed shop, nursery, market, person)
+- `acquired_on`: optional date (when the seeds, saplings or pods were bought or received)
+- `notes`
+
+The same variety can have many lots, e.g. Habanero grown from seed in 2025, bought as a sapling in 2026, or bought as fresh pods at a market. SHU resolution for a line is: line override → variety.
+
+**`catalog_items`** (non-pepper ingredients, for autocomplete and aliases)
+- `id`, `name` (canonical), `kind`, `aliases` (JSON array), `notes`
+- Seed entry: **`Ocot kvasný liehový 8 %`** (distilled spirit vinegar), kind `acid`, aliases `["ocot"]`.
+  - In the owner's notes, a bare "ocot" always means this one.
+  - The importer and the name autocomplete resolve aliases to the canonical name and keep the original text in `note`.
+
+**`vessels`** (fermenting crocks; the owner has more than one)
+- `id`, `name` (e.g. "Crock A"), `notes`
+- There is deliberately no stored tare. The empty vessel is weighed fresh at the start of every ferment step and saved in that step's `params.vessel_tare_g`.
+
+**`bottle_types`**
+- `id`, `name` (e.g. "Woozy 150 ml"), `volume_ml`, `notes`
+
+**`events`** (the timeline)
+- `id`, `batch_id`, optional `step_id`
+- `type`: `note | photo | voice | ph | burp | weigh | issue | tasting | bottled`
+- `occurred_at`, `author`, `text`: optional
+- `payload`: JSON, typed per `type` with valibot. Shapes:
+  - `ph`: `{ value, method: "meter" | "strip" }`
+  - `weigh`: `{ gross_g }` (net = gross − vessel tare of the ferment step)
+  - `issue`: `{ kind: "kahm" | "mold" | "leak" | "other" }`
+  - `tasting`: `{ rating: 1..5 }`
+  - `bottled`: `{ fills: [{ bottle_type_id, count }], leftover_g?, total_g?, ph?, ph_not_measured_reason? }`
+  - `photo`, `voice`, `note`, `burp`: `{}` (the content is in the attachments or `text`)
+
+**`attachments`**
+- `id`, `event_id`
+- `type`: `photo | audio`
+- `file`, `thumb` (photos only): relative paths under `media/`
+- `taken_at`: from EXIF for photos if present, otherwise capture time
+- `duration_s` (audio), `width`, `height` (photos)
+
+**`recipes`** and **`recipe_lines`**: see §7.3.
+
+**`settings`**: key/value, e.g. `target_salt_pct` (default **3.0**)
+
+**`push_subscriptions`**: M6 only.
+
+### 6.3 Status transitions
+
+- Creating a `ferment` step with a date → `fermenting`.
+- Any later step with a date → `processing`.
+- A `bottled` event → `bottled`.
+- Manual override is allowed in the edit screen.
+
+## 7. Calculations
+
+### 7.1 Bases (shared by derived values and recipes)
+
+| Base | Definition |
+|---|---|
+| `peppers` | Ferment-step lines of kind `pepper` |
+| `solids` | Ferment-step lines excluding `water` and `salt` |
+| `ferment_total` | Ferment-step lines excluding `salt` (= solids + water) |
+| `mash` | Lines of kind `mash` |
+| `sauce` | All post-ferment additions |
+
+### 7.2 Derived values (compute, never store)
+
+**Salt %**
+- `salt / ferment_total × 100`
+- The owner's batches are all about 3.0 %. This definition must reproduce the seed data (test it):
+
+| Batch | Salt % |
+|---|---|
+| 1 | 3.00 |
+| 2 | 2.96 |
+| 3 | 3.04 |
+| 4 | 2.97 |
+
+**Suggested salt for the target %**
+- `target_pct × ferment_total / 100`, shown live while entering the ferment step.
+
+**Ferment days**
+- Ferment step date → date of the first later step that has one, falling back to the `bottled` event date.
+- Seed data expects **20, 17, 22 and 19** days.
+
+**Sauce total**
+- Sum of `sauce`. Show it as "additions"; it is not the yield. Water lost while cooking is not tracked. A measured `total_g` at bottling overrides it for display.
+
+**Xanthan %**
+- `thickener / sauce total × 100`. Only shown when the sauce includes mash. Batch 4 expects ≈ **0.042 %**.
+
+**Heat estimate** (rough)
+- `Σ(pepper grams × SHU) / solids`
+- Show a range: the SHU minimums give the low end, the maximums the high end.
+- If a variety has only one bound, use it for both.
+- Label it clearly as a rough estimate.
+
+**Net weight** for weigh events
+- `gross_g − vessel_tare_g`
+
+**Bottled volume**
+- `Σ(count × volume_ml)` over the fills.
+
+### 7.3 Recipes with goals
+
+A recipe is a reusable template. You fix what you have (usually pepper amounts from the harvest) plus goals, and the app computes the rest.
+
+**`recipes`**
+- `id`, `name`, `notes_md`
+- `heat_target_shu`: optional
+- `created_from_batch_id`: optional
+
+**`recipe_lines`**
+- `id`, `recipe_id`
+- `step_index` and `step_type`, mirroring the batch steps
+- `position`, `name`, `kind`, `variety_id?`, `catalog_id?`
+- `mode`: `grams | percent | remainder`
+  - `grams`: an absolute amount
+  - `percent`: `percent` of `base` (one of the bases in §7.1)
+  - `remainder`: reserved, not in v1
+- `solve_for_heat`: boolean; at most one line per recipe
+
+Percentages are **baker's-percentage style**: relative to a base, not to the total. Example: garlic `5 %` of `peppers`, salt `3 %` of `ferment_total`, water `120 %` of `solids`, xanthan `0.3 %` of `sauce`.
+
+**Evaluation order** (avoids circular definitions):
+1. Absolute (`grams`) lines.
+2. Percent lines, base by base in the order `peppers → solids → ferment_total → mash → sauce`.
+3. Each base's sum includes only the lines already computed. A line never counts towards its own base.
+   - Example: water at 120 % of `solids` is not part of `solids`.
+   - Example: xanthan at 0.3 % of `sauce` is computed from the sauce without itself.
+4. `mash`-based and post-ferment `sauce`-based lines stay "pending" until the mash is actually weighed.
+
+**Heat goal**
+- If `heat_target_shu` is set and one `grams` line is marked `solve_for_heat`, find that line's grams so the heat-estimate midpoint (§7.2) meets the target.
+- Use bisection: recompute the whole recipe each iteration, since percent lines move with it.
+- If no non-negative solution exists, say so plainly; don't clamp silently.
+- Without a solve line, just show the estimated range against the target.
+
+**Using a recipe**
+- "Start batch from recipe" → the user enters the actual pepper grams → planned amounts are computed and snapshotted into `planned_g`.
+- In weighing mode the user then logs the actual grams per line, with the planned value shown large and the deviation shown.
+
+**Saving a recipe**
+- "Save batch as recipe" converts a batch's actual lines into a recipe: peppers become `grams`, the other ferment lines become percent of `peppers`, and salt becomes percent of `ferment_total`.
+- The user can edit the result afterwards.
+
+### 7.4 pH display rule
+
+| pH | Colour | Text label |
+|---|---|---|
+| ≥ 4.6 | Red | "Above 4.6 safety threshold" |
+| 4.0 – 4.6 | Amber | "Below 4.6, above common 4.0 target" |
+| < 4.0 | Green | "Below 4.0" |
+
+- Always show the text label, never colour alone.
+- Show it as information, not as a blocker.
+- Provide a short info sheet linking sources.
+
+## 8. Client app
+
+### 8.1 Dirty-hands UX — hard requirements
+
+Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped on the counter, screen partly splattered.
+
+1. **Big targets.**
+   - Primary actions in active flows: full width, at least 64 px tall.
+   - Anything tappable: at least 56 px, with at least 12 px gaps.
+2. **Thumb zone.** Actions live in the bottom half of the screen; nothing important sits in the top corners.
+3. **Tap only.**
+   - No core action may require a swipe, long-press, drag, pinch or double-tap.
+   - Don't fight the iOS edge-swipe-back gesture.
+4. **Forgiving.**
+   - No confirmation dialogs in flows. Every action shows a large **Undo** toast (8 s).
+   - Destructive edits live only in the edit screen.
+   - Primary buttons are debounced (about 500 ms) against accidental double taps.
+5. **Custom numpad for grams.**
+   - Full-screen 3×4 keypad with huge keys, decimal key, backspace and a big **Next** button. The iOS keyboard is not used for weights.
+   - Accept comma or dot.
+6. **Weighing mode.**
+   - One ingredient per screen, in order.
+   - The name, planned grams (if any) and the number being typed are shown at at least 48 px type.
+   - **Tare first.** Weighing mode for a ferment step always opens with "Put the empty crock on the scale": pick the vessel (chips) and enter its weight. That becomes the step's tare.
+   - Tare helper for additions: "container on the scale?" → enter the container weight once and type gross weights; the app stores net.
+7. **One thing per screen** in flows (new batch, step additions, bottling). No scrolling needed for the current action.
+8. **Keep the screen awake** during flows, using the Screen Wake Lock API. It works in Home Screen web apps since iOS/iPadOS 18.4. Fail silently where unsupported.
+9. **Voice notes.**
+   - A big tap-to-start, tap-to-stop record button creates a `voice` event, via `MediaRecorder` (Safari produces MP4/AAC).
+   - Plain text notes are also fine; iOS keyboard dictation works on them.
+10. **Photos.** One big button opens the camera directly.
+11. **Readable.** Base text at least 18 px, key numbers at least 32 px, high contrast in both light and dark mode.
+12. **Choices over typing.** Chips for kind, recent and catalog names, varieties, and bottle types. The next batch number is pre-filled.
+13. **Autosave.** Every entry is saved immediately; there is no "Save" step. Leaving a flow mid-way loses nothing.
+14. **Standalone mode.** Respect safe-area insets; don't rely on browser chrome.
+15. **Language.** The UI is English with i18n-ready strings. Data is whatever the user types.
+
+### 8.2 Screens
+
+1. **Batch list**
+   - One card per batch: number, colour dot, status, and a day counter for fermenting batches ("Day 7").
+   - Newest first. A big **New batch** button.
+2. **New batch**
+   - Choose "from recipe" or "blank".
+   - Then: number and start date (default today), then weighing mode, which starts with the vessel and tare (§8.1 item 6) and continues with the ferment additions.
+   - Live salt % and suggested salt are shown throughout.
+3. **Batch detail**
+   - Header: key stats (salt %, days, status, heat range).
+   - Steps with their additions.
+   - Timeline, newest first, with thumbnails and audio players.
+   - Bottom bar: **Photo**, **Voice**, **pH**, **Note**, **More** (weigh, burp, issue, tasting).
+   - **Add step** button (blend / cook / strain / rest / other), which opens weighing mode for that step's additions.
+4. **Bottling checklist**
+   - Fills: pick a bottle type and a count, with repeatable rows; add a new bottle type inline.
+   - Required: pH (or "not measured" with a reason), at least one fill row, at least one photo, and confirmation that the step additions are complete.
+   - Optional: leftover grams, measured total.
+   - Shows the bottled volume. Saving creates a `bottled` event.
+5. **Edit batch:** all fields, step and line CRUD, manual status override.
+6. **Recipes:** list, edit (a desktop-friendly table is fine), and the live calculator with a heat-goal readout.
+7. **Varieties and lots:** edit pepper reference data; add lots per season.
+8. **Catalog and bottle types:** small edit lists.
+9. **Export:** download a zip of everything, or a single batch `.md`. Shows the last nightly export time.
+10. **Settings:** target salt %; in M6, notifications and the nudge schedule.
+
+### 8.3 Photos
+
+- Capture with `<input type="file" accept="image/*" capture="environment">`.
+- Read EXIF (`exifr`) for `taken_at` before resizing.
+- Resize client-side to a JPEG: long edge about 2048 px, plus a thumbnail of about 400 px. Upload both.
+- The server validates MIME type and size.
+- **Verify on a real iPhone** that HEIC captures decode and resize correctly; handle failure gracefully.
+
+### 8.4 Voice notes
+
+- `MediaRecorder` on the microphone stream, with a maximum length of 3 minutes.
+- Upload as `audio/mp4`. Show the duration in the timeline.
+- Request microphone permission on the first tap, with a short explanation.
+
+### 8.5 Connectivity (online-first with an outbox)
+
+- The service worker caches the app shell so the app opens without the server.
+- Writes (lines, steps, events, attachments) go through an **IndexedDB outbox**. They are replayed in order with backoff, and are idempotent because of client UUIDs.
+- The UI shows a pending-items count.
+- If `/api/me` is unreachable, show a large banner: "Can't reach the server — is Tailscale on?" Keep the outbox.
+- Reads are shown from the last cached data when offline. Full offline-first sync is out of scope.
+
+## 9. Nudges (M6)
+
+- **Delivery.** Web Push with VAPID. The server sends to Apple's push service, which delivers to the phone.
+  - **Delivery does not depend on Tailscale being on** for the phone. The server only needs outbound HTTPS to `*.push.apple.com`.
+- **Tapping a notification** opens the app.
+  - If Tailscale is off, the cached shell still loads, deep-links to the batch from cached data and shows the §8.5 banner.
+  - New entries queue in the outbox.
+- **Subscribing.** This (one time per device) needs the server reachable.
+- **iOS requirements.** The app must be installed to the Home Screen. The permission prompt must be triggered by a user tap ("Enable reminders" button). Every push must show a notification, because Safari revokes permission for invisible pushes.
+- **Scheduler.** In-process. Rules are configurable in Settings:
+  - photo prompt on day 0
+  - optional daily burp reminder
+  - photo + pH prompt on days 7 and 14
+  - "ready for the next step?" at N days (default 14)
+- **Quiet hours:** 22:00–08:00.
+
+## 10. Export and import
+
+### 10.1 Batch file format (canonical; see `seed/`)
+
+- Markdown with YAML frontmatter, one file per batch, named `batch-NNN.md`.
+- The frontmatter holds the structured data; the body holds free-form notes.
+- Frontmatter keys:
+  - `batch`, `color`, `status`, `recipe` (name or null)
+  - `steps[]`: each with `{ type, date, params?, add[] }`; a ferment step's `params` may include `vessel` (name) and `vessel_tare_g`
+  - `bottled` (date)
+  - `output`: `{ ph, fills[]: { bottle, ml, count }, leftover_g?, total_g? }`
+- Each `add` entry: `{ name, local?, kind, g, planned_g?, lot?, shu?, shu_source?, note? }`
+  - `lot`: `{ origin, propagation?, season?, supplier?, acquired? }`
+  - `shu`: a number, `[min, max]`, or `[null, max]`
+- Body sections: `## Notes`, `## Timeline` (export only, generated from events, with attachment paths `media/<file>`), `## Tasting`.
+
+### 10.2 Export
+
+- On demand from the UI.
+- Nightly at 03:00 local, written to `DATA_DIR/exports/`:
+  - one `.md` file per batch
+  - `all.json` (a full dump of every table)
+  - a `media/` folder with copies or hard links
+- Nightly `VACUUM INTO DATA_DIR/backups/ferment-YYYYMMDD.db`, keeping the last 14.
+
+### 10.3 Import
+
+- CLI: `npm run import -- seed/*.md`. This creates batches, steps, lines, varieties and lots as needed, and resolves catalog aliases.
+- Also import legacy JSON files from the original log. Their format: `batchNumber`, `color`, `fermentationStartDate`, `bottlingDate`, and `ingredients[]` with `name`, `amountInG`, `isFermented`, `spicinessInShu`, `isPartiallyUsed`.
+- Mapping for legacy JSON:
+  - `isFermented: true` → the ferment step; otherwise one blend step
+  - `spicinessInShu` → `shu_min = shu_max`, with `shu_source: legacy-log`
+  - Ignore a batch-level `spicinessInShu`
+- Import is idempotent by batch number: skip existing batches unless `--force`.
+- **Round-trip test:** import the seeds, export, and compare the frontmatter (normalised).
+
+## 11. API sketch
+
+All routes are under `/api` and are JSON unless noted. Every route requires an allowed login. Use valibot for validation on both sides.
+
+**Identity and health**
+- `GET /api/me` → `{ login, name }`
+- `GET /healthz` → `ok` (no auth, any peer)
+
+**Batches**
+- `GET /api/batches`
+- `POST /api/batches`
+- `GET /api/batches/:id` (includes steps, lines, events, attachments and derived values)
+- `PATCH /api/batches/:id`
+
+**Steps and lines**
+- `POST /api/batches/:id/steps`
+- `PATCH /api/steps/:id`
+- `DELETE /api/steps/:id`
+- `POST /api/steps/:id/lines`
+- `PATCH /api/lines/:id`
+- `DELETE /api/lines/:id`
+
+**Events and attachments**
+- `POST /api/batches/:id/events`
+- `PATCH /api/events/:id`
+- `DELETE /api/events/:id`
+- `POST /api/events/:id/attachments` (multipart: `file`, optional `thumb`)
+- `GET /media/:file` (auth, immutable cache headers)
+
+**Reference data:** `GET`/`POST`/`PATCH` for each of
+- `/api/varieties`
+- `/api/lots`
+- `/api/catalog`
+- `/api/bottle-types`
+- `/api/vessels`
+
+**Recipes**
+- `GET /api/recipes`
+- `POST /api/recipes`
+- `GET /api/recipes/:id`
+- `PATCH /api/recipes/:id`
+- `POST /api/recipes/:id/evaluate` (body: actual pepper grams → computed plan; the maths lives in `src/shared` so the client can also compute locally)
+- `POST /api/batches/:id/save-as-recipe`
+
+**Export**
+- `GET /api/export.zip`
+- `GET /api/batches/:id/export.md`
+
+**Push (M6)**
+- `POST /api/push/subscribe`
+- `DELETE /api/push/subscribe`
+
+All `POST` routes accept the client-generated `id` and are idempotent: a repeated `id` returns the existing record.
+
+## 12. Milestones and acceptance criteria
+
+**Priority: get to real use fast.** The owner wants to log batches 5+ in the app right away and iterate on it while using it. Ship the thinnest end-to-end slice first (M0–M2a), deploy it, then improve in small increments. Each milestone ends in a deployable image.
+
+**M0 — Deployment spike and fast deploy loop**
+- Dockerfile, hello-world server and README deploy steps for Unraid (template settings: bridge network, Use Tailscale on, Serve on the app port, no port mappings, `/data` volume, env vars).
+- Checks 1–4 in §3.1 pass, or the documented fallback is in place. Check 5 is recorded.
+- A one-command redeploy, `scripts/deploy.sh`: build the image on the NAS (or build locally and push to a registry), then restart the container. Iterating must not require clicking through the Unraid UI.
+- Migrations run automatically on start-up, and every deploy is preceded by an automatic `VACUUM INTO` backup.
+
+**M1 — Data and API**
+- Migrations, every table in §6, the API in §11 (recipes may be stubbed) and the derived values in §7.2 with tests.
+- The import CLI loads `seed/batch-001.md` … `batch-004.md`.
+- Tests reproduce the salt %, day counts and the batch-4 xanthan % in §7.2.
+
+**M2a — Walking skeleton (deploy and start logging)**
+- Batch list, new batch (blank, no recipe) with tare-first weighing mode and the custom numpad, and batch detail with the timeline.
+- Photo, note and pH events; add a step with its additions.
+- Undo on every action.
+- The §8.1 sizing and thumb-zone rules apply from day one; polish comes later.
+- After this, batches 5+ get entered in the app (or via a hand-written `seed/batch-005.md` + import, whichever is faster).
+
+**M2b — Rest of the kitchen UX**
+- Remaining screens from §8.2 (bottling checklist, edit, varieties and lots, catalog, bottle types, vessels).
+- Every §8.1 requirement is met. Do a checklist review against it, and test on a real iPhone with wet fingers or gloves.
+- Voice notes, wake lock and the bottling checklist's required fields.
+
+**M3 — Export and backups**
+- §10.2 nightly and on-demand export, backups with retention, and the round-trip test.
+
+**M4 — Outbox and offline shell**
+- §8.5 behaviour.
+- Kill the server mid-session → entries queue → restart → entries sync, with no duplicates.
+
+**M5 — Recipes**
+- §7.3 evaluation with tests: base ordering, no self-reference, the heat solve (including the no-solution case) and save-batch-as-recipe.
+- Start-from-recipe flow with planned vs actual in weighing mode.
+
+**M6 — Nudges**
+- §9.
+
+**Later / ideas (do not build without asking)**
+- Home Assistant temperature history attached to ferments.
+- Cross-batch comparison view.
+- Printable labels.
+- Audio transcription.
+
+## 13. Conventions for the implementer
+
+- Keep it small. Every new dependency needs a one-line justification in the commit message.
+- README covers: local dev (`DEV_USER`), building the image, Unraid template settings, the iOS install and VPN On Demand tip, backup and restore.
+- Never log media data or full request bodies.
+- Commit seeds and migrations; never commit `/data`.
+
+## 14. Open data questions
+
+- **Sparkler:** the seed shop page lists it as *C. annuum*, up to 160,000 SHU; the minimum is unknown, so it is seeded as `[null, 160000]`.
+- **Batch 4 vessel:** which of the two crocks was used is unknown; the 1669 g tare is the empty crock.
+- **Batches 5+** are in progress on paper. Enter them as soon as M2a is deployed.
