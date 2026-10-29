@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Dark mode follows the system setting. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* shadcn/ui tokens (stone), with a chilli-red primary. */
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.001 106.423);
+  --foreground: oklch(0.147 0.004 49.25);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.147 0.004 49.25);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.147 0.004 49.25);
+  --primary: oklch(0.444 0.177 26.899);
+  --primary-foreground: oklch(0.985 0.001 106.423);
+  --secondary: oklch(0.923 0.003 48.717);
+  --secondary-foreground: oklch(0.216 0.006 56.043);
+  --muted: oklch(0.97 0.001 106.424);
+  --muted-foreground: oklch(0.444 0.011 73.639);
+  --accent: oklch(0.923 0.003 48.717);
+  --accent-foreground: oklch(0.216 0.006 56.043);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.869 0.005 56.366);
+  --input: oklch(0.709 0.01 56.259);
+  --ring: oklch(0.444 0.177 26.899);
+  --ok: oklch(0.527 0.154 150.069);
+  --warn: oklch(0.666 0.179 58.318);
+  --danger: oklch(0.577 0.245 27.325);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.147 0.004 49.25);
+    --foreground: oklch(0.985 0.001 106.423);
+    --card: oklch(0.216 0.006 56.043);
+    --card-foreground: oklch(0.985 0.001 106.423);
+    --popover: oklch(0.216 0.006 56.043);
+    --popover-foreground: oklch(0.985 0.001 106.423);
+    --primary: oklch(0.704 0.191 22.216);
+    --primary-foreground: oklch(0.147 0.004 49.25);
+    --secondary: oklch(0.268 0.007 34.298);
+    --secondary-foreground: oklch(0.985 0.001 106.423);
+    --muted: oklch(0.268 0.007 34.298);
+    --muted-foreground: oklch(0.809 0.008 58.071);
+    --accent: oklch(0.374 0.01 67.558);
+    --accent-foreground: oklch(0.985 0.001 106.423);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 18%);
+    --input: oklch(1 0 0 / 30%);
+    --ring: oklch(0.704 0.191 22.216);
+    --ok: oklch(0.792 0.209 151.711);
+    --warn: oklch(0.837 0.164 84.429);
+    --danger: oklch(0.704 0.191 22.216);
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+}
+
+@keyframes toast-timer {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0;
+  }
+}
+
+@layer base {
+  /*
+   * Dirty-hands sizing (SPEC §8.1), applied once here: an 18px root makes
+   * base text 18px and scales every rem-based size with it, so h-14 is 63px
+   * (any tap target) and h-16 is 72px (primary actions in flows).
+   */
+  html {
+    font-size: 18px;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    overscroll-behavior-y: none;
+  }
+  button {
+    /* No double-tap zoom or 300ms delay on taps. */
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}

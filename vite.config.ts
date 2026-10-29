@@ -1,0 +1,48 @@
+import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
+
+const web = fileURLToPath(new URL('./src/web', import.meta.url));
+// `npm run dev` serves the API here; Vite proxies to it so the app and the API
+// share an origin, as they do behind Tailscale Serve.
+const api = `http://127.0.0.1:${process.env.PORT ?? 3000}`;
+
+export default defineConfig({
+  root: web,
+  publicDir: 'public',
+  resolve: { alias: { '@': web } },
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'script-defer',
+      manifest: {
+        name: 'Fermentation Log',
+        short_name: 'Ferment',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        background_color: '#fafaf9',
+        theme_color: '#7f1d1d',
+        icons: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // App shell only (SPEC §8.5); API reads and media stay network-only until M4.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/healthz/],
+        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+      },
+    }),
+  ],
+  build: { outDir: '../../dist/web', emptyOutDir: true },
+  server: {
+    proxy: { '/api': api, '/media': api },
+  },
+});

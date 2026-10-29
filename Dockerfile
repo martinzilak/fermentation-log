@@ -4,7 +4,7 @@ FROM node:26-trixie-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY tsconfig.json tsconfig.build.json ./
+COPY tsconfig.json tsconfig.build.json tsconfig.web.json vite.config.ts ./
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
