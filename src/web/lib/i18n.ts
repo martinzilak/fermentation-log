@@ -62,11 +62,6 @@ const en = {
   'detail.closePhoto': 'Close photo',
 
   'weigh.tareTitle': 'Put the empty crock on the scale',
-  'weigh.whichCrock': 'Which crock?',
-  'weigh.newCrock': 'New crock',
-  'weigh.crockName': 'Crock name',
-  'weigh.addCrock': 'Add crock',
-  'weigh.emptyWeight': 'Empty crock weight',
   'weigh.tareSaved': 'Crock tare {g}',
   'weigh.whatNext': 'What goes in next?',
   'weigh.search': 'Search or type a name',

@@ -1,6 +1,7 @@
 // Weighing mode for one step (SPEC §8.1 item 6, §8.2 items 2–3). A ferment
-// step opens with the empty crock on the scale; then one ingredient per
-// screen: pick a name, its kind and lot if needed, type the grams, Next.
+// step opens with the empty crock on the scale (crocks aren't saved, SPEC
+// §15.2); then one ingredient per screen: pick a name, its kind and lot if
+// needed, type the grams, Next.
 // Each line is saved on Next; salt % and suggested salt update live.
 import { useState } from 'react';
 import { bases, saltPct, suggestedSaltG, type CalcLine, type CalcStep } from '../../shared/calc.ts';
@@ -17,14 +18,13 @@ import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
-import { suggest, varietyFor, type Pick } from '@/lib/suggest';
-import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety, Vessel } from '@/lib/types';
+import { suggest, type Pick } from '@/lib/suggest';
+import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety } from '@/lib/types';
 
 type Chosen = Pick & { kind: Kind; lot_id: string | null };
 
 type Stage =
-  | { name: 'vessel' }
-  | { name: 'tare'; vessel: Vessel }
+  | { name: 'tare' }
   | { name: 'pick' }
   | { name: 'kind'; pick: Pick }
   | { name: 'lot'; pick: Chosen; lots: Lot[] }
@@ -66,7 +66,6 @@ function lotLabel(lot: Lot): string {
 function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   const toast = useToast();
   const batchUrl = `/api/batches/${batch.id}`;
-  const vessels = useQuery<Vessel[]>('/api/vessels').data ?? [];
   const catalog = useQuery<CatalogItem[]>('/api/catalog').data ?? [];
   const varieties = useQuery<Variety[]>('/api/varieties').data ?? [];
   const lots = useQuery<Lot[]>('/api/lots').data ?? [];
@@ -74,10 +73,9 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
 
   const needsTare = step.type === 'ferment' && step.params.vessel_tare_g == null && step.lines.length === 0;
-  const [stage, setStage] = useState<Stage>(needsTare ? { name: 'vessel' } : { name: 'pick' });
+  const [stage, setStage] = useState<Stage>(needsTare ? { name: 'tare' } : { name: 'pick' });
   const [value, setValue] = useState('');
   const [query, setQuery] = useState('');
-  const [newVessel, setNewVessel] = useState<string | null>(null);
   const [container, setContainer] = useState<number | null>(null);
 
   const go = (next: Stage) => {
@@ -128,17 +126,9 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
 
   // --- Saving ---
 
-  async function addVessel(name: string) {
-    const vessel = await toast.run(() => api.post<Vessel>('/api/vessels', { id: crypto.randomUUID(), name }));
-    if (!vessel) return;
-    void refresh('/api/vessels');
-    setNewVessel(null);
-    go({ name: 'tare', vessel });
-  }
-
-  async function saveTare(vessel: Vessel, grams: number) {
+  async function saveTare(grams: number) {
     const before = step.params;
-    const params = { ...before, vessel_id: vessel.id, vessel_tare_g: grams };
+    const params = { ...before, vessel_tare_g: grams };
     const saved = await toast.run(() => api.patch(`/api/steps/${step.id}`, { params }));
     if (!saved) return;
     void refresh(batchUrl);
@@ -146,7 +136,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     toast.show(t('weigh.tareSaved', { g: formatGrams(grams) }), async () => {
       await api.patch(`/api/steps/${step.id}`, { params: before });
       await refresh(batchUrl);
-      go({ name: 'vessel' });
+      go({ name: 'tare' });
     });
   }
 
@@ -160,12 +150,14 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
         grams,
         lot_id: pick.lot_id,
         catalog_id: pick.catalog_id,
+        variety_id: pick.variety_id,
         note: pick.note,
       }),
     );
     if (!saved) return;
     void refresh(batchUrl);
-    invalidate('/api/lines/recent');
+    // A new name created a catalog item or variety.
+    for (const url of ['/api/lines/recent', '/api/catalog', '/api/varieties']) invalidate(url);
     setQuery('');
     go({ name: 'pick' });
     toast.show(t('weigh.added', { name: pick.name, g: formatGrams(grams) }), async () => {
@@ -180,10 +172,10 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     if (!pick.kind) return go({ name: 'kind', pick });
     const chosen: Chosen = { ...pick, kind: pick.kind, lot_id: null };
     if (chosen.kind !== 'pepper') return go({ name: 'grams', pick: chosen });
-    const variety = varieties.find((v) => v.id === pick.variety_id) ?? varietyFor(pick.name, varieties);
-    const own = variety ? lots.filter((l) => l.variety_id === variety.id).sort((a, b) => b.season - a.season) : [];
+    // A new pepper name has no variety or lots yet; the server creates the variety.
+    const own = lots.filter((l) => l.variety_id === pick.variety_id).sort((a, b) => b.season - a.season);
     if (own.length === 0) return go({ name: 'grams', pick: chosen });
-    go({ name: 'lot', pick: { ...chosen, variety_id: variety!.id }, lots: own });
+    go({ name: 'lot', pick: chosen, lots: own });
   }
 
   async function nextFromGrams(pick: Chosen) {
@@ -200,56 +192,10 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   );
 
   switch (stage.name) {
-    case 'vessel': {
-      const typing = newVessel !== null || vessels.length === 0;
-      return (
-        <Screen
-          title={t('weigh.tareTitle')}
-          subtitle={subtitle}
-          footer={
-            typing && newVessel?.trim() ? (
-              <Button size="lg" onClick={() => void addVessel(newVessel.trim())}>
-                {t('weigh.addCrock')}
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={leave}>
-                {t('common.back')}
-              </Button>
-            )
-          }
-        >
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('weigh.whichCrock')}</h2>
-          <Chips>
-            {vessels.map((v) => (
-              <Chip key={v.id} onClick={() => go({ name: 'tare', vessel: v })}>
-                {v.name}
-              </Chip>
-            ))}
-            {vessels.length > 0 && (
-              <Chip selected={newVessel !== null} onClick={() => setNewVessel(newVessel === null ? '' : null)}>
-                {t('weigh.newCrock')}
-              </Chip>
-            )}
-          </Chips>
-          {typing && (
-            <Input
-              className="mt-4"
-              autoFocus
-              placeholder={t('weigh.crockName')}
-              aria-label={t('weigh.crockName')}
-              value={newVessel ?? ''}
-              onChange={(e) => setNewVessel(e.target.value)}
-            />
-          )}
-        </Screen>
-      );
-    }
-
     case 'tare': {
-      const { vessel } = stage;
-      const next = () => typed !== null && void saveTare(vessel, round2(typed));
+      const next = () => typed !== null && void saveTare(round2(typed));
       return (
-        <Screen title={t('weigh.emptyWeight')} subtitle={`${subtitle} · ${vessel.name}`} footer={numpadFooter(() => go({ name: 'vessel' }), next)}>
+        <Screen title={t('weigh.tareTitle')} subtitle={subtitle} footer={numpadFooter(leave, next)}>
           <Readout value={value} unit="g" />
         </Screen>
       );

@@ -76,6 +76,7 @@ export interface Variety {
   id: string;
   name: string;
   species: string | null;
+  aliases: string[];
   local_names: string[];
   shu_min: number | null;
   shu_max: number | null;

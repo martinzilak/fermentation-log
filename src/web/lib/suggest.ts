@@ -1,9 +1,10 @@
-// Ingredient chips (SPEC §8.1 item 12). Names compare without case or
-// accents, so "sol" finds "Soľ" and typing an existing name never creates a
-// second spelling of it. A search also matches the kind ("salt") and catalog
-// aliases; an alias resolves to the canonical name and keeps what was typed
-// in the note (SPEC §6.2). Before anything is typed, only a few chips show:
-// the names this kind of step usually takes, most recent first.
+// Ingredient chips (SPEC §8.1 item 12, §15.3). Each chip is one catalog item
+// or variety. Names compare without case or accents, so "salt" finds Salt and
+// typing an existing name never creates a second spelling of it. A search also
+// matches the kind and the aliases ("soľ" finds Salt); an alias resolves to
+// the entry's name and keeps what was typed in the note (SPEC §6.2). Before
+// anything is typed, only a few chips show: the entries this kind of step
+// usually takes, most recent first.
 import { fold } from '../../shared/names.ts';
 import type { Kind, StepType } from '../../shared/schemas.ts';
 import { kindLabel } from './i18n.ts';
@@ -32,13 +33,13 @@ interface Candidate {
 }
 
 function candidates({ recent, catalog, varieties }: Sources, stepType: StepType | undefined): Candidate[] {
-  const aliasesOf = new Map(catalog.map((c) => [c.id, c.aliases]));
+  const aliasesOf = new Map([...catalog, ...varieties].map((e) => [e.id, e.aliases]));
   const usual = stepType ? recent.filter((r) => r.step_types.includes(stepType)) : recent;
   const other = stepType ? recent.filter((r) => !r.step_types.includes(stepType)) : [];
   return [
     ...[...usual, ...other].map((r) => ({
       pick: { name: r.name, kind: r.kind, catalog_id: r.catalog_id, variety_id: r.variety_id, note: null },
-      aliases: (r.catalog_id && aliasesOf.get(r.catalog_id)) || [],
+      aliases: aliasesOf.get(r.catalog_id ?? r.variety_id ?? '') ?? [],
     })),
     ...catalog.map((c) => ({
       pick: { name: c.name, kind: c.kind, catalog_id: c.id, variety_id: null, note: null },
@@ -46,7 +47,7 @@ function candidates({ recent, catalog, varieties }: Sources, stepType: StepType 
     })),
     ...varieties.map((v) => ({
       pick: { name: v.name, kind: 'pepper' as const, catalog_id: null, variety_id: v.id, note: null },
-      aliases: [],
+      aliases: v.aliases,
     })),
   ];
 }
@@ -63,7 +64,7 @@ export function suggest(query: string, sources: Sources, stepType?: StepType): S
   // Ranked buckets: exact name or alias, then prefix, then anywhere.
   const ranked: [Pick[], Pick[], Pick[]] = [[], [], []];
   for (const { pick, aliases } of candidates(sources, stepType)) {
-    const key = `${fold(pick.name)}|${pick.kind}`;
+    const key = pick.catalog_id ?? pick.variety_id ?? `${fold(pick.name)}|${pick.kind}`;
     if (seen.has(key)) continue;
     seen.add(key);
     if (!q) {
@@ -84,10 +85,4 @@ export function suggest(query: string, sources: Sources, stepType?: StepType): S
     options: ranked.flat().slice(0, q ? SEARCH_LIMIT : IDLE_LIMIT),
     exact: ranked[0].length > 0,
   };
-}
-
-/** The variety a pepper name refers to, ignoring case and accents. */
-export function varietyFor(name: string, varieties: Variety[]): Variety | undefined {
-  const n = fold(name);
-  return varieties.find((v) => fold(v.name) === n);
 }
