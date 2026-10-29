@@ -4,6 +4,7 @@
 // aliases; an alias resolves to the canonical name and keeps what was typed
 // in the note (SPEC §6.2). Before anything is typed, only a few chips show:
 // the names this kind of step usually takes, most recent first.
+import { fold } from '../../shared/names.ts';
 import type { Kind, StepType } from '../../shared/schemas.ts';
 import { kindLabel } from './i18n.ts';
 import type { CatalogItem, RecentLine, Variety } from './types.ts';
@@ -24,16 +25,6 @@ export interface Sources {
 
 export const IDLE_LIMIT = 8;
 export const SEARCH_LIMIT = 12;
-
-/** Case- and accent-insensitive form of a name: "Soľ" and "sol" are the same. */
-export const fold = (s: string) =>
-  s.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
-
-/** A typed new name, tidied: single spaces and a capital first letter ("voda" → "Voda"). */
-export function cleanName(s: string): string {
-  const name = s.replace(/\s+/g, ' ').trim();
-  return name.charAt(0).toLocaleUpperCase() + name.slice(1);
-}
 
 interface Candidate {
   pick: Pick;

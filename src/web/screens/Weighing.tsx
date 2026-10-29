@@ -4,6 +4,7 @@
 // Each line is saved on Next; salt % and suggested salt update live.
 import { useState } from 'react';
 import { bases, saltPct, suggestedSaltG, type CalcLine, type CalcStep } from '../../shared/calc.ts';
+import { cleanName } from '../../shared/names.ts';
 import { KINDS, type Kind } from '../../shared/schemas.ts';
 import { Chip, Chips } from '@/components/Chip';
 import { NumpadFooter, Readout } from '@/components/Numpad';
@@ -16,7 +17,7 @@ import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
-import { cleanName, suggest, varietyFor, type Pick } from '@/lib/suggest';
+import { suggest, varietyFor, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety, Vessel } from '@/lib/types';
 
 type Chosen = Pick & { kind: Kind; lot_id: string | null };

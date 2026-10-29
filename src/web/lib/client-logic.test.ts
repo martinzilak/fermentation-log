@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { appendKey, formatShuRange, parseDecimal } from './numbers.ts';
 import { phLevel, phText } from './ph.ts';
-import { cleanName, IDLE_LIMIT, SEARCH_LIMIT, suggest, varietyFor, type Sources } from './suggest.ts';
+import { cleanName } from '../../shared/names.ts';
+import { IDLE_LIMIT, SEARCH_LIMIT, suggest, varietyFor, type Sources } from './suggest.ts';
 
 const type = (keys: string, opts?: { decimals?: number; maxInt?: number }) =>
   [...keys].reduce((value, key) => appendKey(value, key === '<' ? 'back' : key, opts), '');
