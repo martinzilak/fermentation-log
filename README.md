@@ -132,6 +132,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - Install the app from Safari: **Share → Add to Home Screen**.
 - If it was added before the app had its icon (M0's hello page), remove it and add it again to get the icon and full-screen mode.
 - In the Tailscale app, enable **VPN On Demand** with a rule that connects automatically for `*.ts.net` hostnames.
+- **Without the server** (Tailscale off, NAS down): the app still opens and shows the last data it had. Weighing, notes, pH, photos and the other batch entries are kept on the phone and sent once the server is back; the banner shows how many are waiting. Reference data (catalog, varieties, lots, bottle types, settings) can only be changed while the server is reachable. Keep the app installed and don't clear Safari's website data while entries are waiting, or they are lost.
 
 ## Troubleshooting
 
@@ -139,6 +140,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - **403 "not in ALLOWED_LOGINS":** add the login shown in the message to `ALLOWED_LOGINS` and apply.
 - **403 "only reachable through Tailscale Serve":** the request didn't come from Serve. Someone probably added a port mapping or changed `BIND_HOST`. Remove it.
 - **"Can't reach the server":** Tailscale is off on the device.
+- **"Syncing: N" doesn't go away:** the server keeps failing one queued entry with an error, and everything after it waits behind it. Check the container log for the failing request.
 
 ## Importing batch files
 

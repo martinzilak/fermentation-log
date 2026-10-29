@@ -645,3 +645,13 @@ Where this section conflicts with an earlier one, this section wins.
 - **API addition to §11:** `GET /api/export/status` returns `{ last_export_at, last_backup_on }` for the Export screen.
 - **A missed night.** If the server was down at 03:00, the export and snapshot run when it next starts.
 - **The zip** is written by a small built-in writer (no dependency). Photos are stored, not recompressed. It has no zip64, so it refuses an export over 4 GiB or 65,535 files.
+
+### 15.7 Details settled while building M4
+
+- **What goes through the outbox:** every write to batches, steps, lines, events and attachments (§8.5 lists lines, steps, events and attachments; batches are included so a batch can be started offline). Reference data (catalog, varieties, lots, bottle types, settings, merges) is saved directly, and offline it fails with "Not saved".
+- **Queued writes show at once.** They are laid over the cached batch views and the batch list until the server's data includes them, so weighing keeps its live salt % and the timeline shows the entry. Status and derived values are recomputed on the phone from the same shared code. A batch started offline is built from its queued writes.
+- **Event times.** An event is dated when it is logged (`occurred_at` set on the phone), not when it reaches the server.
+- **Retries.** Server errors, timeouts, 401, 403, 408 and 429 keep the write queued and retry with backoff (1 s doubling to 60 s), and also when the network or the app comes back. Any other 4xx is the server refusing that write: it is dropped and an error toast says why (for example a batch number taken in the meantime).
+- **Offline reads.** Responses are kept in IndexedDB and shown when the server can't be reached. The reference lists weighing and bottling need are fetched when the app starts, so they are there offline. Photos are cached by the service worker (the newest 500).
+- **The banner** sits in each screen's pinned header. Offline it shows "Waiting to sync: N"; online, while entries are still being sent, a quiet "Syncing: N".
+- **Limits.** There is no screen to inspect or discard queued entries; a write the server keeps failing blocks the ones after it. The outbox assumes one open tab per device.
