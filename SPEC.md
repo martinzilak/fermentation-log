@@ -525,7 +525,8 @@ All `POST` routes accept the client-generated `id` and are idempotent: a repeate
 - After this, batches 5+ get entered in the app (or via a hand-written `seed/batch-005.md` + import, whichever is faster).
 
 **M2b — Rest of the kitchen UX**
-- Remaining screens from §8.2 (bottling checklist, edit, varieties and lots, catalog, bottle types, vessels).
+- Remaining screens from §8.2 (bottling checklist, edit, varieties and lots, catalog, bottle types). No vessels screen; see §15.
+- The §15 changes: soft-deleted batches, no saved crocks, one-off bottles at bottling.
 - Every §8.1 requirement is met. Do a checklist review against it, and test on a real iPhone with wet fingers or gloves.
 - Voice notes, wake lock and the bottling checklist's required fields.
 
@@ -561,3 +562,33 @@ All `POST` routes accept the client-generated `id` and are idempotent: a repeate
 - **Sparkler:** the seed shop page lists it as *C. annuum*, up to 160,000 SHU; the minimum is unknown, so it is seeded as `[null, 160000]`.
 - **Batch 4 vessel:** which of the two crocks was used is unknown; the 1669 g tare is the empty crock.
 - **Batches 5+** are in progress on paper. Enter them as soon as M2a is deployed.
+
+## 15. Addendum — 2026-10-29, owner review of M2a — **Decided**
+
+Where this section conflicts with an earlier one, this section wins.
+
+### 15.1 Settled in M2a
+
+- **Ferment day counter.** The start date is **Day 1**. This is display only: the API's `ferment_day` stays days elapsed (0 on the start date), and ferment duration (§7.2: 20, 17, 22 and 19 days) is unchanged.
+- **Numpad screens.** Next takes two thirds of the bottom row, beside Back, rather than the full width of §8.1 item 1. This keeps the typed number on screen on smaller phones.
+- **API additions to §11:**
+  - `DELETE /api/batches/:id`
+  - `GET /api/lines/recent`, for the ingredient chips
+  - `GET`/`PATCH /api/settings`, for the target salt %
+
+### 15.2 For M2b
+
+**Soft delete for batches**
+- `DELETE /api/batches/:id` marks the batch deleted (`deleted_at`) instead of removing its rows. Undo restores it.
+- Deleted batches are left out of the list, the next-number suggestion and exports. Their numbers can be used again.
+- Bottled and archived batches can't be deleted; the API answers 409. A finished batch is archived instead.
+
+**No saved fermentation vessels**
+- The owner has two crocks that look identical but weigh slightly differently. Naming them adds nothing, because the empty crock is weighed at every ferment step anyway (§6.2).
+- Weighing mode goes straight from "Put the empty crock on the scale" to the tare numpad. There are no crock chips and no "New crock".
+- New ferment steps store only `vessel_tare_g`. `vessel_id` values recorded earlier stay readable but nothing new sets one, and there is no vessels screen.
+
+**Bottling: saved bottle types plus one-off bottles**
+- Bottle types (name, volume) stay for bottles used regularly, and they appear as chips in the bottling checklist.
+- A fill row can instead be a one-off bottle: volume in ml, count and an optional label. It doesn't create a bottle type.
+- `bottled` fills become `{ bottle_type_id, count }` or `{ volume_ml, count, label? }`. Bottled volume (§7.2) sums both kinds.
