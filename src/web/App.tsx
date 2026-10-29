@@ -9,11 +9,15 @@ import { matchPath, navigate, usePath } from '@/lib/router';
 import { AddStep } from '@/screens/AddStep';
 import { BatchDetail } from '@/screens/BatchDetail';
 import { BatchList } from '@/screens/BatchList';
+import { BatchMore, IssueEvent, TastingEvent, WeighEvent } from '@/screens/BatchMore';
+import { Bottling } from '@/screens/Bottling';
+import { BatchEdit, LineEdit, StepEdit } from '@/screens/EditBatch';
 import { EntryEditor, EntryList, LotEditor } from '@/screens/Entries';
 import { BottleTypeEditor, BottleTypeList, MoreMenu, SettingsScreen } from '@/screens/Kitchen';
 import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
+import { VoiceNote } from '@/screens/VoiceNote';
 import { Weighing } from '@/screens/Weighing';
 import type { ReactNode } from 'react';
 
@@ -25,6 +29,15 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/b/:id/add-step', (p) => <AddStep batchId={p.id!} />],
   ['/b/:id/note', (p) => <NoteEvent batchId={p.id!} />],
   ['/b/:id/ph', (p) => <PhEvent batchId={p.id!} />],
+  ['/b/:id/voice', (p) => <VoiceNote batchId={p.id!} />],
+  ['/b/:id/more', (p) => <BatchMore id={p.id!} />],
+  ['/b/:id/weigh', (p) => <WeighEvent id={p.id!} />],
+  ['/b/:id/issue', (p) => <IssueEvent id={p.id!} />],
+  ['/b/:id/tasting', (p) => <TastingEvent id={p.id!} />],
+  ['/b/:id/bottle', (p) => <Bottling id={p.id!} />],
+  ['/b/:id/edit', (p) => <BatchEdit id={p.id!} />],
+  ['/b/:id/s/:stepId/edit', (p) => <StepEdit batchId={p.id!} stepId={p.stepId!} />],
+  ['/b/:id/l/:lineId', (p) => <LineEdit key={p.lineId} batchId={p.id!} lineId={p.lineId!} />],
   ['/more', () => <MoreMenu />],
   ['/catalog', () => <EntryList path="catalog" />],
   ['/catalog/:id', (p) => <EntryEditor key={p.id} path="catalog" id={p.id!} />],

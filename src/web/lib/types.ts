@@ -26,6 +26,10 @@ export interface LineView {
   note: string | null;
   variety_id: string | null;
   variety_name: string | null;
+  /** The line's own SHU override; `shu` below is what applies. */
+  shu_min: number | null;
+  shu_max: number | null;
+  shu_source: string | null;
   shu: { min: number | null; max: number | null; source: string | null } | null;
 }
 

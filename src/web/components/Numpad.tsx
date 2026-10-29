@@ -46,7 +46,7 @@ export function Numpad({ value, onChange, onEnter, decimals = 2, maxInt = 6 }: P
         <button
           key={key}
           type="button"
-          aria-label={key === 'back' ? 'Delete' : key === '.' ? 'Decimal point' : key}
+          aria-label={key === 'back' ? t('numpad.delete') : key === '.' ? t('numpad.decimal') : key}
           disabled={key === '.' && decimals === 0}
           // A double tap on the button that opened this screen must not type a digit.
           onClick={() => !justPressed() && press(key)}

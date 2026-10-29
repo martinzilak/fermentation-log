@@ -1,29 +1,25 @@
 // Batch detail (SPEC §8.2 item 3): key stats, steps with their additions,
-// and the timeline, newest first. Photo, Note and pH sit in the bottom bar.
-import { Camera, FlaskConical, NotebookPen } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+// and the timeline, newest first. Photo, Voice, pH, Note and More sit in the bottom bar.
+import { Ellipsis, FlaskConical, Mic, NotebookPen } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { ColorDot, PhLabel, StatusBadge } from '@/components/Labels';
 import { ActionRow, Screen } from '@/components/Screen';
-import { errorMessage, useToast } from '@/components/Toast';
+import { PhotoButton } from '@/components/PhotoButton';
 import { Button } from '@/components/ui/button';
-import { api, HttpError, OfflineError } from '@/lib/api';
-import { dayNumber, formatDay, formatStamp } from '@/lib/format';
+import { dayNumber, formatDay, formatStamp, stars } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
-import { uploadPhoto } from '@/lib/photo';
 import { acceptPress } from '@/lib/press';
-import { invalidate, refresh, useQuery } from '@/lib/query';
+import { useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
-import type { Attachment, BatchView, BottleType, EventView, StepView, Vessel } from '@/lib/types';
+import type { Attachment, BatchView, BottleType, EventView, Fill, StepView, Vessel } from '@/lib/types';
+
 
 export function BatchDetail({ id }: { id: string }) {
   const url = `/api/batches/${id}`;
-  const toast = useToast();
   const { data: batch, error } = useQuery<BatchView>(url);
   const vessels = useQuery<Vessel[]>('/api/vessels').data ?? [];
   const bottleTypes = useQuery<BottleType[]>('/api/bottle-types').data ?? [];
-  const camera = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<Attachment | null>(null);
 
   if (!batch) {
@@ -37,31 +33,6 @@ export function BatchDetail({ id }: { id: string }) {
         }
       />
     );
-  }
-
-  async function addPhoto(file: File) {
-    setUploading(true);
-    const eventId = crypto.randomUUID();
-    try {
-      await api.post(`/api/batches/${id}/events`, { id: eventId, type: 'photo' });
-      try {
-        await uploadPhoto(eventId, crypto.randomUUID(), file);
-      } catch (err) {
-        await api.del(`/api/events/${eventId}`).catch(() => {});
-        throw err;
-      }
-      await refresh(url);
-      toast.show(t('detail.photoAdded'), async () => {
-        await api.del(`/api/events/${eventId}`);
-        await refresh(url);
-      });
-    } catch (err) {
-      const network = err instanceof HttpError || err instanceof OfflineError;
-      toast.error(network ? errorMessage(err) : t('detail.photoFailed', { error: (err as Error).message }));
-    } finally {
-      setUploading(false);
-      invalidate('/api/batches');
-    }
   }
 
   const d = batch.derived;
@@ -80,17 +51,22 @@ export function BatchDetail({ id }: { id: string }) {
       footer={
         <>
           <ActionRow>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" disabled={uploading} onClick={() => camera.current?.click()}>
-              <Camera />
-              {uploading ? t('detail.uploading') : t('detail.photo')}
+            <PhotoButton batchId={id} className="flex-col gap-0 px-0 text-base" />
+            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/voice`)}>
+              <Mic />
+              {t('detail.voice')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/note`)}>
+            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
+              <FlaskConical />
+              {t('detail.ph')}
+            </Button>
+            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/note`)}>
               <NotebookPen />
               {t('detail.note')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
-              <FlaskConical />
-              {t('detail.ph')}
+            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/more`)}>
+              <Ellipsis />
+              {t('more.title')}
             </Button>
           </ActionRow>
           <ActionRow>
@@ -99,18 +75,6 @@ export function BatchDetail({ id }: { id: string }) {
             </Button>
             <Button onClick={() => navigate(`/b/${id}/add-step`)}>{t('detail.addStep')}</Button>
           </ActionRow>
-          <input
-            ref={camera}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void addPhoto(file);
-            }}
-          />
         </>
       }
     >
@@ -226,11 +190,17 @@ function EventItem({ event: e, bottleTypes, onOpen }: { event: EventView; bottle
           {e.net_g != null && <span className="ml-2 text-lg text-muted-foreground">{t('detail.net', { g: formatGrams(e.net_g) })}</span>}
         </p>
       )}
+      {e.type === 'issue' && typeof p.kind === 'string' && <p className="mt-1 text-xl font-semibold">{t(`issue.${p.kind as 'kahm'}`)}</p>}
+      {e.type === 'tasting' && typeof p.rating === 'number' && (
+        <p className="mt-1 text-2xl" aria-label={t('event.rating', { n: p.rating })}>
+          {stars(p.rating)}
+        </p>
+      )}
       {e.type === 'bottled' && Array.isArray(p.fills) && (
         <ul className="mt-1 text-lg">
-          {(p.fills as { bottle_type_id: string; count: number }[]).map((f) => (
-            <li key={f.bottle_type_id}>
-              {t('detail.fills', { count: f.count, bottle: bottleTypes.find((b) => b.id === f.bottle_type_id)?.name ?? '?' })}
+          {(p.fills as Fill[]).map((f, i) => (
+            <li key={i}>
+              {t('detail.fills', { count: f.count, bottle: fillName(f, bottleTypes) })}
             </li>
           ))}
           {typeof p.ph === 'number' && (
@@ -255,6 +225,12 @@ function EventItem({ event: e, bottleTypes, onOpen }: { event: EventView; bottle
       ))}
     </>
   );
+}
+
+export function fillName(f: Fill, bottleTypes: BottleType[]): string {
+  if ('volume_ml' in f) return [f.label, `${formatNumber(f.volume_ml)} ml`].filter(Boolean).join(' · ');
+  const type = bottleTypes.find((b) => b.id === f.bottle_type_id);
+  return type ? `${type.name} · ${formatNumber(type.volume_ml)} ml` : '?';
 }
 
 function PhotoViewer({ attachment, onClose }: { attachment: Attachment; onClose: () => void }) {
