@@ -1,6 +1,7 @@
 // Batch detail (SPEC §8.2 item 3): key stats, steps with their additions,
-// and the timeline, newest first. Photo, Voice, pH, Note and More sit in the bottom bar.
-import { Ellipsis, FlaskConical, Mic, NotebookPen } from 'lucide-react';
+// and the timeline, newest first. Photo, pH, Note and More sit in the bottom bar.
+// Voice notes were dropped (SPEC §15.5); any recorded earlier still play here.
+import { Ellipsis, FlaskConical, NotebookPen } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { ColorDot, PhLabel, StatusBadge } from '@/components/Labels';
 import { ActionRow, Screen } from '@/components/Screen';
@@ -51,20 +52,16 @@ export function BatchDetail({ id }: { id: string }) {
       footer={
         <>
           <ActionRow>
-            <PhotoButton batchId={id} className="flex-col gap-0 px-0 text-base" />
-            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/voice`)}>
-              <Mic />
-              {t('detail.voice')}
-            </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
+            <PhotoButton batchId={id} className="flex-col gap-0 text-base" />
+            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
               <FlaskConical />
               {t('detail.ph')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/note`)}>
+            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/note`)}>
               <NotebookPen />
               {t('detail.note')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 px-0 text-base" onClick={() => navigate(`/b/${id}/more`)}>
+            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/more`)}>
               <Ellipsis />
               {t('more.title')}
             </Button>

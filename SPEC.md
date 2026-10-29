@@ -634,3 +634,4 @@ Where this section conflicts with an earlier one, this section wins.
 ### 15.5 From the M2b test
 
 - **Batch colour at bottling.** The colour marks the caps or labels, so it is chosen in the bottling checklist, right after the bottles, rather than when the batch is started (§8.2 item 2). The edit screen can still change it.
+- **No voice notes.** They are dropped: text notes with iOS dictation cover the same need, and stay searchable. This replaces §8.1 item 9's record button, §8.4, Voice in the §8.2 bottom bar, and the voice notes in M2b. The `voice` event type and audio uploads stay in the API, so nothing recorded earlier is lost.

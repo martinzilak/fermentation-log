@@ -18,7 +18,6 @@ import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
 import { PhInfo } from '@/screens/PhInfo';
-import { VoiceNote } from '@/screens/VoiceNote';
 import { Weighing } from '@/screens/Weighing';
 import type { ReactNode } from 'react';
 
@@ -30,7 +29,6 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/b/:id/add-step', (p) => <AddStep batchId={p.id!} />],
   ['/b/:id/note', (p) => <NoteEvent batchId={p.id!} />],
   ['/b/:id/ph', (p) => <PhEvent batchId={p.id!} />],
-  ['/b/:id/voice', (p) => <VoiceNote batchId={p.id!} />],
   ['/b/:id/more', (p) => <BatchMore id={p.id!} />],
   ['/b/:id/weigh', (p) => <WeighEvent id={p.id!} />],
   ['/b/:id/issue', (p) => <IssueEvent id={p.id!} />],

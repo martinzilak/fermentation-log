@@ -164,7 +164,7 @@ Everything lives in `/data`, which is `/mnt/user/appdata/ferment-log/` on the ho
 | Path | Contents |
 |---|---|
 | `ferment.db` | SQLite database (WAL mode) |
-| `media/` | photos and voice notes |
+| `media/` | photos (and audio from voice notes, if any were recorded) |
 | `exports/` | nightly Markdown + JSON export (M3) |
 | `backups/ferment-startup-*.db` | `VACUUM INTO` snapshot taken on every container start, before migrations (last 10 kept) |
 | `backups/ferment-preimport-*.db` | snapshot taken before each import run (last 5 kept) |

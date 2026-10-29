@@ -131,7 +131,6 @@ const en = {
   'detail.net': 'net {g}',
   'detail.fills': '{count} × {bottle}',
   'detail.closePhoto': 'Close photo',
-  'detail.voice': 'Voice',
 
   'batchEdit.open': 'Edit batch',
   'batchEdit.title': 'Edit #{n}',
@@ -187,15 +186,6 @@ const en = {
   'issue.mold': 'Mould',
   'issue.leak': 'Leak',
   'issue.other': 'Other',
-
-  'voice.title': 'Voice note',
-  'voice.hint': 'Up to 3 minutes',
-  'voice.limit': '{time} left',
-  'voice.start': 'Start recording',
-  'voice.stop': 'Stop and save',
-  'voice.saved': 'Voice note {time} saved',
-  'voice.noMic': 'The microphone isn’t available. Allow it in Settings → Safari → Microphone.',
-  'voice.permission': 'The first time, the phone asks to use the microphone. Recording stops by itself after 3 minutes.',
 
   'bottle.start': 'Bottle it',
   'bottle.title': 'Bottling',
