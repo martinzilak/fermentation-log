@@ -34,6 +34,7 @@ const en = {
   'more.bottlesHint': 'Bottles you use regularly',
 
   'edit.saved': 'Saved',
+  'edit.noDate': 'Not set',
   'edit.badNumber': '{label}: not a valid number',
   'edit.uses': 'Uses: {n}',
   'edit.searchOrAdd': 'Search or add',

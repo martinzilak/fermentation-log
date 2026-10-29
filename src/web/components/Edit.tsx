@@ -8,6 +8,7 @@ import { useToast } from '@/components/Toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { formatDay } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { parseDecimal } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
@@ -51,13 +52,12 @@ interface TextFieldProps {
   onSave: (value: string | null) => Promise<boolean>;
   multiline?: boolean;
   required?: boolean;
-  type?: 'text' | 'date';
   placeholder?: string | undefined;
   inputMode?: 'text' | 'decimal' | 'numeric';
 }
 
 /** A text field that saves when it loses focus (or on Enter), if it changed. */
-export function TextField({ label, value, onSave, multiline = false, required = false, type = 'text', placeholder, inputMode }: TextFieldProps) {
+export function TextField({ label, value, onSave, multiline = false, required = false, placeholder, inputMode }: TextFieldProps) {
   const [text, setText] = useState(value ?? '');
   const [focused, setFocused] = useState(false);
   useEffect(() => {
@@ -87,16 +87,58 @@ export function TextField({ label, value, onSave, multiline = false, required = 
       ) : (
         <Input
           {...common}
-          type={type}
-          // iOS sizes a native date input to its content and ignores the
-          // width unless its own appearance is turned off.
-          className={type === 'date' ? 'block appearance-none text-left [&::-webkit-date-and-time-value]:text-left' : undefined}
           inputMode={inputMode}
           enterKeyHint="done"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
       )}
+    </label>
+  );
+}
+
+/**
+ * A date that saves when its picker closes. The box shows the date as text and
+ * the native input lies invisible on top: iOS sizes a visible date input to
+ * its own content, wider than the screen.
+ */
+export function DateField({ label, value, onSave }: { label: string; value: string | null; onSave: (value: string | null) => Promise<boolean> }) {
+  const [date, setDate] = useState(value ?? '');
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setDate(value ?? '');
+  }, [value, focused]);
+
+  async function commit() {
+    setFocused(false);
+    const next = date || null;
+    if (next === value) return;
+    if (!(await onSave(next))) setDate(value ?? '');
+  }
+
+  return (
+    <label className="block">
+      <span className="mb-1 block text-lg text-muted-foreground">{label}</span>
+      <span className="relative flex h-14 items-center overflow-hidden rounded-xl border border-input px-4 text-lg shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+        {date ? formatDay(date) : <span className="text-muted-foreground">{t('edit.noDate')}</span>}
+        <input
+          type="date"
+          aria-label={label}
+          value={date}
+          onFocus={() => setFocused(true)}
+          onBlur={() => void commit()}
+          onChange={(e) => setDate(e.target.value)}
+          // Desktop browsers open the picker only from their own icon.
+          onClick={(e) => {
+            try {
+              e.currentTarget.showPicker();
+            } catch {
+              // Already open, or a browser without showPicker.
+            }
+          }}
+          className="absolute inset-0 size-full min-w-0 opacity-0"
+        />
+      </span>
     </label>
   );
 }

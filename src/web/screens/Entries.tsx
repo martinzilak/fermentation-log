@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { fold } from '../../shared/names.ts';
 import { KINDS, ORIGINS, PROPAGATIONS } from '../../shared/schemas.ts';
 import { Chip, Chips } from '@/components/Chip';
-import { LinkRow, NumberField, RowList, Section, TextField, usePatch } from '@/components/Edit';
+import { DateField, LinkRow, NumberField, RowList, Section, TextField, usePatch } from '@/components/Edit';
 import { Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
@@ -356,7 +356,7 @@ export function LotEditor({ id }: { id: string }) {
         <TextField label={t('lot.supplier')} value={l.supplier} onSave={(supplier) => save({ supplier }, { supplier: l.supplier })} />
       </Section>
       <Section>
-        <TextField label={t('lot.acquired')} type="date" value={l.acquired_on} onSave={(acquired_on) => save({ acquired_on }, { acquired_on: l.acquired_on })} />
+        <DateField label={t('lot.acquired')} value={l.acquired_on} onSave={(acquired_on) => save({ acquired_on }, { acquired_on: l.acquired_on })} />
       </Section>
       <Section>
         <TextField label={t('edit.notes')} value={l.notes ?? null} multiline onSave={(notes) => save({ notes }, { notes: l.notes ?? null })} />
