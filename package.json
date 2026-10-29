@@ -18,7 +18,8 @@
     "@hono/standard-validator": "0.4.1",
     "better-sqlite3": "13.0.3",
     "hono": "4.13.14",
-    "valibot": "1.5.0"
+    "valibot": "1.5.0",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
