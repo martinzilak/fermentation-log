@@ -1,0 +1,174 @@
+import { randomUUID } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testApp } from './test-support.ts';
+
+let t: ReturnType<typeof testApp>;
+beforeEach(() => {
+  t = testApp();
+});
+afterEach(() => t.cleanup());
+
+const id = () => randomUUID();
+
+async function newBatch(extra: Record<string, unknown> = {}) {
+  const res = await t.call('POST', '/api/batches', { id: id(), ...extra });
+  expect(res.status).toBe(201);
+  return res.body;
+}
+
+async function addStep(batchId: string, body: Record<string, unknown>) {
+  const res = await t.call('POST', `/api/batches/${batchId}/steps`, { id: id(), ...body });
+  expect(res.status).toBe(201);
+  return res.body;
+}
+
+describe('batches', () => {
+  it('numbers new batches after the highest existing number', async () => {
+    expect((await newBatch()).number).toBe(1);
+    expect((await newBatch({ number: 7 })).number).toBe(7);
+    expect((await newBatch()).number).toBe(8);
+    const list = await t.call('GET', '/api/batches');
+    expect(list.body.map((b: { number: number }) => b.number)).toEqual([8, 7, 1]);
+  });
+
+  it('returns the existing record when a POST id repeats', async () => {
+    const batchId = id();
+    const first = await t.call('POST', '/api/batches', { id: batchId, name: 'Harvest' });
+    const again = await t.call('POST', '/api/batches', { id: batchId, name: 'Changed' });
+    expect(first.status).toBe(201);
+    expect(again.status).toBe(200);
+    expect(again.body.name).toBe('Harvest');
+    expect(t.db.prepare('SELECT COUNT(*) FROM batches').pluck().get()).toBe(1);
+  });
+
+  it('records the author and timestamps', async () => {
+    const batch = await newBatch();
+    expect(batch.author).toBe('cook@example.com');
+    expect(batch.created_at).toBe('2026-10-29T10:00:00.000Z');
+  });
+
+  it('rejects a duplicate batch number with 409', async () => {
+    await newBatch({ number: 3 });
+    const res = await t.call('POST', '/api/batches', { id: id(), number: 3 });
+    expect(res.status).toBe(409);
+  });
+
+  it('returns 400 with issues for an invalid body and 404 for an unknown batch', async () => {
+    const bad = await t.call('POST', '/api/batches', { id: 'not-a-uuid' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.issues[0].path).toBe('id');
+    expect((await t.call('GET', `/api/batches/${id()}`)).status).toBe(404);
+  });
+});
+
+describe('status transitions', () => {
+  it('follows steps and the bottled event, and respects a manual override', async () => {
+    const batch = await newBatch();
+    const status = async () => (await t.call('GET', `/api/batches/${batch.id}`)).body.status;
+
+    expect(await status()).toBe('planned');
+    await addStep(batch.id, { type: 'ferment', date: '2026-10-01', params: { vessel_tare_g: 1669 } });
+    expect(await status()).toBe('fermenting');
+    const blend = await addStep(batch.id, { type: 'blend' });
+    expect(await status()).toBe('fermenting');
+    await t.call('PATCH', `/api/steps/${blend.id}`, { date: '2026-10-20' });
+    expect(await status()).toBe('processing');
+
+    await t.call('PATCH', `/api/batches/${batch.id}`, { status: 'archived' });
+    await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'bottled', payload: { fills: [] } });
+    expect(await status()).toBe('archived');
+
+    const reset = await t.call('PATCH', `/api/batches/${batch.id}`, { status: null });
+    expect(reset.body.status).toBe('bottled');
+    expect(reset.body.status_manual).toBe(false);
+  });
+
+  it('counts ferment days on the list while fermenting', async () => {
+    const batch = await newBatch();
+    await addStep(batch.id, { type: 'ferment', date: '2026-10-22' });
+    const [row] = (await t.call('GET', '/api/batches')).body;
+    expect(row.ferment_date).toBe('2026-10-22');
+    expect(row.ferment_day).toBe(7);
+  });
+});
+
+describe('steps and lines', () => {
+  it('validates params by step type', async () => {
+    const batch = await newBatch();
+    const res = await t.call('POST', `/api/batches/${batch.id}/steps`, {
+      id: id(),
+      type: 'cook',
+      params: { minutes: -1 },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.issues[0].path).toBe('params.minutes');
+  });
+
+  it('appends lines in order and derives salt % on the batch', async () => {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment', date: '2026-10-01' });
+    for (const [name, kind, grams] of [
+      ['Habanero', 'pepper', 500],
+      ['Voda', 'water', 500],
+      ['Soľ', 'salt', 30],
+    ] as const) {
+      const res = await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name, kind, grams });
+      expect(res.status).toBe(201);
+    }
+    const view = (await t.call('GET', `/api/batches/${batch.id}`)).body;
+    expect(view.steps[0].lines.map((l: { position: number }) => l.position)).toEqual([0, 1, 2]);
+    expect(view.derived.salt_pct).toBe(3);
+    expect(view.derived.suggested_salt_g).toBe(30);
+  });
+
+  it('clears a nullable field with PATCH null and deletes idempotently', async () => {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment' });
+    const line = (await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name: 'Mrkva', kind: 'vegetable', grams: 200 })).body;
+    expect((await t.call('PATCH', `/api/lines/${line.id}`, { grams: null })).body.grams).toBeNull();
+    expect((await t.call('DELETE', `/api/lines/${line.id}`)).status).toBe(204);
+    expect((await t.call('DELETE', `/api/lines/${line.id}`)).status).toBe(204);
+  });
+
+  it('refuses a lot id that does not exist', async () => {
+    const batch = await newBatch();
+    const step = await addStep(batch.id, { type: 'ferment' });
+    const res = await t.call('POST', `/api/steps/${step.id}/lines`, { id: id(), name: 'X', kind: 'pepper', lot_id: id() });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('events', () => {
+  it('validates payloads by event type and computes net weight from the tare', async () => {
+    const batch = await newBatch();
+    await addStep(batch.id, { type: 'ferment', params: { vessel_tare_g: 1669 } });
+    const bad = await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'ph', payload: { value: 3.5 } });
+    expect(bad.status).toBe(400);
+    const weigh = await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'weigh', payload: { gross_g: 4200 } });
+    expect(weigh.status).toBe(201);
+    expect(weigh.body.occurred_at).toBe('2026-10-29T10:00:00.000Z');
+    const view = (await t.call('GET', `/api/batches/${batch.id}`)).body;
+    expect(view.events[0].net_g).toBe(2531);
+  });
+
+  it('refuses a step from another batch', async () => {
+    const a = await newBatch();
+    const b = await newBatch();
+    const step = await addStep(b.id, { type: 'ferment' });
+    const res = await t.call('POST', `/api/batches/${a.id}/events`, { id: id(), type: 'note', step_id: step.id, text: 'x' });
+    expect(res.status).toBe(400);
+  });
+
+  it('lists the timeline newest first', async () => {
+    const batch = await newBatch();
+    for (const at of ['2026-10-02T08:00:00Z', '2026-10-05T08:00:00Z', '2026-10-03T08:00:00Z']) {
+      await t.call('POST', `/api/batches/${batch.id}/events`, { id: id(), type: 'burp', occurred_at: at });
+    }
+    const view = (await t.call('GET', `/api/batches/${batch.id}`)).body;
+    expect(view.events.map((e: { occurred_at: string }) => e.occurred_at.slice(0, 10))).toEqual([
+      '2026-10-05',
+      '2026-10-03',
+      '2026-10-02',
+    ]);
+  });
+});

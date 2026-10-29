@@ -32,7 +32,7 @@ if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
 
 if (config.devUser) console.warn(`DEV MODE: every request acts as ${config.devUser}`);
 
-const app = createApp(config);
+const app = createApp({ config, db, mediaDir: path.join(config.dataDir, 'media') });
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.bindHost }, (info) => {
   console.log(`Listening on ${info.address}:${info.port}`);
 });

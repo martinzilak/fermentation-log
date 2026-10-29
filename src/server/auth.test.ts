@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createApp } from './app.ts';
 import { decodeHeaderName, isLoopback } from './auth.ts';
 import { loadConfig } from './config.ts';
+import { testApp } from './test-support.ts';
 
 const prodEnv = { NODE_ENV: 'production', ALLOWED_LOGINS: 'owner@example.com, Friend@Example.com' };
 
 function appWithPeer(peer: string | undefined, env: NodeJS.ProcessEnv = prodEnv) {
-  return createApp(loadConfig(env), () => peer);
+  return testApp(env, () => peer).app;
 }
 
 const ident = { 'Tailscale-User-Login': 'owner@example.com', 'Tailscale-User-Name': 'Owner' };
