@@ -635,3 +635,13 @@ Where this section conflicts with an earlier one, this section wins.
 
 - **Batch colour at bottling.** The colour marks the caps or labels, so it is chosen in the bottling checklist, right after the bottles, rather than when the batch is started (§8.2 item 2). The edit screen can still change it.
 - **No voice notes.** They are dropped: text notes with iOS dictation cover the same need, and stay searchable. This replaces §8.1 item 9's record button, §8.4, Voice in the §8.2 bottom bar, and the voice notes in M2b. The `voice` event type and audio uploads stay in the API, so nothing recorded earlier is lost.
+
+### 15.6 Details settled while building M3
+
+- **Batch file additions to §10.1.** A step may carry `note`. `output` may carry `ph_not_measured_reason`. A fill without `bottle` is a one-off bottle, `{ ml, count, label? }` (§15.2). Exports write these and the importer reads them, so importing an export and exporting again changes nothing.
+- **Names in exports** are the entries' English names (§15.3). The round-trip test maps the seed files' names through the aliases before comparing.
+- **Deleted batches** are left out of `all.json` and `media/` as well as the batch files. The database snapshots still have them.
+- **Timeline.** One list item per event, oldest first, in `TZ`: `- YYYY-MM-DD HH:MM · <what>: <text>`, with continuation lines and media links (`media/<file>`) indented under it.
+- **API addition to §11:** `GET /api/export/status` returns `{ last_export_at, last_backup_on }` for the Export screen.
+- **A missed night.** If the server was down at 03:00, the export and snapshot run when it next starts.
+- **The zip** is written by a small built-in writer (no dependency). Photos are stored, not recompressed. It has no zip64, so it refuses an export over 4 GiB or 65,535 files.

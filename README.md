@@ -165,12 +165,14 @@ Everything lives in `/data`, which is `/mnt/user/appdata/ferment-log/` on the ho
 |---|---|
 | `ferment.db` | SQLite database (WAL mode) |
 | `media/` | photos (and audio from voice notes, if any were recorded) |
-| `exports/` | nightly Markdown + JSON export (M3) |
+| `exports/` | nightly export: `batch-NNN.md` per batch, `all.json` with every table, `media/` hard links |
 | `backups/ferment-startup-*.db` | `VACUUM INTO` snapshot taken on every container start, before migrations (last 10 kept) |
 | `backups/ferment-preimport-*.db` | snapshot taken before each import run (last 5 kept) |
-| `backups/ferment-YYYYMMDD.db` | nightly snapshot (M3, last 14 kept) |
+| `backups/ferment-YYYYMMDD.db` | nightly snapshot (last 14 kept) |
 
 Every deploy restarts the container, so it always has a fresh pre-migration snapshot. The Appdata Backup plugin can copy `backups/`, which holds consistent files, unlike the live `ferment.db` with its WAL.
+
+The nightly export and snapshot run at 03:00 in `TZ`. If the container was down then, they run when it next starts. Each export replaces the previous one whole, and deleted batches are left out of it (the snapshots still have them). The app's More → Export screen downloads the same files as a zip and shows when the nightly job last ran; a batch's More screen downloads that batch's `.md`.
 
 **Restore:**
 
@@ -178,3 +180,5 @@ Every deploy restarts the container, so it always has a fresh pre-migration snap
 2. Move `ferment.db`, `ferment.db-wal` and `ferment.db-shm` out of the way.
 3. Copy the chosen snapshot to `ferment.db`.
 4. Start the container.
+
+The plain files outlive the app: the batch files are readable as they are, and the import CLI can load them into a fresh database (`node dist/server/cli/import.js exports`). That brings back batches, steps, ingredients, varieties, lots and bottlings, but not the timeline events or photos, which only `all.json` and `media/` keep.
