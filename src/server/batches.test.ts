@@ -172,3 +172,10 @@ describe('events', () => {
     ]);
   });
 });
+
+describe('later milestones', () => {
+  it('answers later-milestone routes with 501', async () => {
+    expect((await t.call('GET', '/api/recipes')).status).toBe(501);
+    expect((await t.call('GET', '/api/export.zip')).status).toBe(501);
+  });
+});

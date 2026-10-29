@@ -8,6 +8,7 @@ import { ApiError, type AppContext } from './http.ts';
 import { batchRoutes } from './routes/batches.ts';
 import { mediaRoutes } from './routes/media.ts';
 import { referenceRoutes } from './routes/reference.ts';
+import { stubRoutes } from './routes/stubs.ts';
 
 const defaultPeer: PeerResolver = (c) => getConnInfo(c).remote.address;
 
@@ -69,6 +70,7 @@ export function createApp({ config, db, mediaDir, getPeer = defaultPeer, now = (
   app.get('/api/me', (c) => c.json(c.get('user')));
   app.route('/api', batchRoutes(ctx));
   app.route('/api', referenceRoutes(ctx));
+  app.route('/api', stubRoutes());
   app.route('/', mediaRoutes(ctx));
 
   app.get('/', (c) => {
