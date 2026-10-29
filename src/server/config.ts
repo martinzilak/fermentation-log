@@ -7,6 +7,8 @@ export interface Config {
   allowedLogins: Set<string>;
   devUser: string | null;
   production: boolean;
+  /** IANA zone for dates and day counts (TZ). */
+  timeZone: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -31,6 +33,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`Invalid PORT: ${env.PORT}`);
   }
 
+  const timeZone = env.TZ || 'Europe/Bratislava';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone });
+  } catch {
+    throw new Error(`Invalid TZ: ${timeZone}`);
+  }
+
   return {
     port,
     bindHost: env.BIND_HOST || '127.0.0.1',
@@ -38,5 +47,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     allowedLogins,
     devUser,
     production,
+    timeZone,
   };
 }
