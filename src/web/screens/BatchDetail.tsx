@@ -207,7 +207,7 @@ function Stat({ label, children, note, wide = false, tone }: StatProps) {
   const [border, text] = tone ? TONES[tone] : [undefined, undefined];
   return (
     <div className={cn('rounded-xl border bg-card p-3', wide && 'col-span-2', border)}>
-      <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">{label}</p>
+      <p className="font-mono text-sm tracking-widest text-muted-foreground uppercase">{label}</p>
       <div className={cn('font-display text-4xl leading-tight font-bold tabular-nums', text)}>{children}</div>
       {note && <p className={cn('mt-1 text-base', text ?? 'text-muted-foreground')}>{note}</p>}
     </div>
