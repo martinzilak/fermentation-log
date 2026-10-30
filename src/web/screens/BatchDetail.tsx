@@ -13,7 +13,7 @@ import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatMl, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
 import { heatLevel } from '@/lib/heat';
-import { saltWarning } from '@/lib/salt';
+import { saltOff, saltWarning } from '@/lib/salt';
 import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import { recipeStepNote } from '@/lib/plan';
@@ -62,7 +62,12 @@ export function BatchDetail({ id }: { id: string }) {
   const pending = bottled
     ? undefined
     : batch.steps.map((step) => ({ step, left: step.lines.filter((l) => l.grams === null).length })).find((p) => p.left > 0);
-  const saltNote = fermentIn ? saltWarning(d.salt_pct, targetPct) : null;
+  // Red is for a real low or high reading. No salt is expected while the
+  // ferment is still being weighed or on its first day, and amber after that.
+  const saltState = saltOff(d.salt_pct, targetPct);
+  const fermentPending = pending?.step.type === 'ferment' || (d.ferment_day ?? 0) < 1;
+  const saltTone = !fermentIn || !saltState ? undefined : saltState !== 'none' ? 'danger' : fermentPending ? undefined : 'warn';
+  const saltNote = !fermentIn ? null : saltState === 'none' && fermentPending ? t('salt.notYet') : saltWarning(d.salt_pct, targetPct);
 
   const stepsSection = (
     <section key="steps">
@@ -150,8 +155,8 @@ export function BatchDetail({ id }: { id: string }) {
     >
       {/* Two to a row; an odd one out takes the whole last row. */}
       <section className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2">
-        <Stat label={t('detail.salt')} note={saltNote ?? undefined} warn={saltNote !== null}>
-          {d.salt_pct === null ? '—' : formatPct(d.salt_pct)}
+        <Stat label={t('detail.salt')} note={saltNote ?? undefined} tone={saltTone}>
+          {saltState === 'none' ? '—' : formatPct(d.salt_pct!)}
         </Stat>
         {fermenting && d.ferment_day !== null ? (
           <Stat label={t('detail.day')}>{dayNumber(d.ferment_day)}</Stat>
@@ -193,15 +198,18 @@ interface StatProps {
   children: ReactNode;
   note?: string | undefined;
   wide?: boolean;
-  warn?: boolean;
+  tone?: 'warn' | 'danger' | undefined;
 }
 
-function Stat({ label, children, note, wide = false, warn = false }: StatProps) {
+const TONES = { warn: ['border-warn', 'text-warn'], danger: ['border-destructive', 'text-destructive'] } as const;
+
+function Stat({ label, children, note, wide = false, tone }: StatProps) {
+  const [border, text] = tone ? TONES[tone] : [undefined, undefined];
   return (
-    <div className={cn('rounded-xl border bg-card p-3', wide && 'col-span-2', warn && 'border-destructive')}>
+    <div className={cn('rounded-xl border bg-card p-3', wide && 'col-span-2', border)}>
       <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">{label}</p>
-      <div className={cn('font-display text-4xl leading-tight font-bold tabular-nums', warn && 'text-destructive')}>{children}</div>
-      {note && <p className={cn('mt-1 text-base', warn ? 'text-destructive' : 'text-muted-foreground')}>{note}</p>}
+      <div className={cn('font-display text-4xl leading-tight font-bold tabular-nums', text)}>{children}</div>
+      {note && <p className={cn('mt-1 text-base', text ?? 'text-muted-foreground')}>{note}</p>}
     </div>
   );
 }

@@ -380,6 +380,7 @@ const en = {
   'weigh.mashAbout': 'weigh it first · about {g}',
   'weigh.onScale': 'On the scale',
   'salt.none': 'No salt yet: the target is {target}.',
+  'salt.notYet': 'Not in yet.',
   'salt.low': 'Salt {pct} is below the {target} target.',
   'salt.high': 'Salt {pct} is above the {target} target.',
 
