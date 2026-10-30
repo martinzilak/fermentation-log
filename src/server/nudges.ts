@@ -36,6 +36,34 @@ export function ruleOnDay(rule: Pick<ReminderRule, 'first_day' | 'every_days'>, 
 
 export const ruleText = (rule: Pick<ReminderRule, 'action' | 'text'>) => (rule.action === 'custom' ? (rule.text ?? '') : TEXT[rule.action]);
 
+/**
+ * The rules a fermenting batch has on a ferment day and hasn't done yet: burp
+ * rules only when its container needs burping, and a photo, burp or pH check
+ * logged that day counts as done.
+ */
+export function rulesDue<R extends Pick<ReminderRule, 'action' | 'first_day' | 'every_days'>>(
+  rules: R[],
+  day: number,
+  needsBurping: boolean,
+  logged: Set<string>,
+): R[] {
+  return rules.filter(
+    (r) => ruleOnDay(r, day) && (r.action !== 'burp' || needsBurping) && !(LOGGED_AS[r.action] && logged.has(LOGGED_AS[r.action]!)),
+  );
+}
+
+/** The event types logged for a batch today, in the server's time zone. */
+export function loggedToday(db: DB, batchId: string, now: Date, timeZone: string): Set<string> {
+  const today = localDate(now.toISOString(), timeZone);
+  // Two days back covers today in any zone.
+  const since = new Date(now.getTime() - 2 * 86_400_000).toISOString();
+  const events = db.prepare('SELECT type, occurred_at FROM events WHERE batch_id = ? AND occurred_at >= ?').all(batchId, since) as {
+    type: string;
+    occurred_at: string;
+  }[];
+  return new Set(events.filter((e) => localDate(e.occurred_at, timeZone) === today).map((e) => e.type));
+}
+
 export interface Nudge {
   batch_id: string;
   day: number;
@@ -60,25 +88,11 @@ export function dueNudges(db: DB, now: Date, timeZone: string): Nudge[] {
     )
     .all() as { id: string; number: number; name: string | null; ferment_date: string; burp: number | null }[];
   const sent = db.prepare('SELECT 1 FROM reminders_sent WHERE batch_id = ? AND rule_id = ? AND day = ?');
-  // Two days back covers today in any zone.
-  const events = db.prepare('SELECT type, occurred_at FROM events WHERE batch_id = ? AND occurred_at >= ?');
-  const since = new Date(now.getTime() - 2 * 86_400_000).toISOString();
 
   const due: Nudge[] = [];
   for (const b of batches) {
     const day = daysBetween(b.ferment_date, today) + 1;
-    const logged = new Set(
-      (events.all(b.id, since) as { type: string; occurred_at: string }[])
-        .filter((e) => localDate(e.occurred_at, timeZone) === today)
-        .map((e) => e.type),
-    );
-    const mine = rules.filter(
-      (r) =>
-        ruleOnDay(r, day) &&
-        (r.action !== 'burp' || b.burp === 1) &&
-        !(LOGGED_AS[r.action] && logged.has(LOGGED_AS[r.action]!)) &&
-        !sent.get(b.id, r.id, day),
-    );
+    const mine = rulesDue(rules, day, b.burp === 1, loggedToday(db, b.id, now, timeZone)).filter((r) => !sent.get(b.id, r.id, day));
     // The same words twice (two photo rules on one day) say it once.
     const body = [...new Set(mine.map(ruleText))].join(' ');
     if (!body) continue;

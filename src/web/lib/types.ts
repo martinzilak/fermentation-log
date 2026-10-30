@@ -1,7 +1,7 @@
 // Shapes of API responses (SPEC §11), as the server's batch view returns them.
 import type { Derived } from '../../shared/calc.ts';
 import type { RecipeLine, RecipeStep } from '../../shared/recipe.ts';
-import type { BatchStatus, EventType, Kind, StepType } from '../../shared/schemas.ts';
+import type { BatchStatus, EventType, Kind, ReminderAction, StepType } from '../../shared/schemas.ts';
 
 export interface BatchSummary {
   id: string;
@@ -11,6 +11,8 @@ export interface BatchSummary {
   status: BatchStatus;
   ferment_date: string | null;
   ferment_day: number | null;
+  /** What the reminder rules still ask of a fermenting batch today. */
+  due: { action: ReminderAction; text: string | null }[];
 }
 
 export interface LineView {
@@ -68,7 +70,7 @@ export interface EventView {
   net_g?: number | null;
 }
 
-export interface BatchView extends Omit<BatchSummary, 'ferment_date' | 'ferment_day'> {
+export interface BatchView extends Omit<BatchSummary, 'ferment_date' | 'ferment_day' | 'due'> {
   status_manual: boolean;
   recipe_id: string | null;
   notes_md: string;

@@ -144,6 +144,24 @@ describe('reminders (SPEC §9, §15.11)', () => {
     expect(due.map((n) => [n.batch_id, n.notice.body])).toEqual([[sealed, 'Burp the jar.']]);
   });
 
+  it('lists what each fermenting batch still has to do today, at any hour', async () => {
+    t = testApp();
+    t.setNow('2026-10-30T07:00:00.000Z');
+    await t.call('PUT', '/api/reminders', [rule('photo', 8, 7, 18), rule('photo', 1, 1, 9), rule('burp', 2, 1, 9), rule('custom', 8, 0, 9, 'Top up the brine.')]);
+    const open = await fermentingBatch('2026-10-23');
+    const sealed = await fermentingBatch('2026-10-23', true, 6);
+    await t.call('POST', `/api/batches/${sealed}/events`, { id: id(), type: 'photo', occurred_at: '2026-10-30T06:30:00.000Z', payload: {} });
+    const due = Object.fromEntries((await t.call('GET', '/api/batches')).body.map((b: { id: string; due: unknown }) => [b.id, b.due]));
+    expect(due[open]).toEqual([
+      { action: 'photo', text: null },
+      { action: 'custom', text: 'Top up the brine.' },
+    ]);
+    expect(due[sealed]).toEqual([
+      { action: 'burp', text: null },
+      { action: 'custom', text: 'Top up the brine.' },
+    ]);
+  });
+
   it('tries again while no device gets it', async () => {
     const fake = fakeSender({ 'https://web.push.apple.com/a': 'failed' });
     t = testApp(undefined, undefined, undefined, fake.send);

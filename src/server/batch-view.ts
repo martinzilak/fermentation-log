@@ -1,9 +1,10 @@
 // Reads a batch with its steps, lines, events and derived values (SPEC §11
 // GET /api/batches/:id), and keeps the automatic status up to date.
 import { daysBetween, derive, localDate, netWeight, type CalcStep } from '../shared/calc.ts';
-import type { BatchStatus, EventType, FermentParams, Kind, StepType } from '../shared/schemas.ts';
+import type { BatchStatus, EventType, FermentParams, Kind, ReminderAction, ReminderRule, StepType } from '../shared/schemas.ts';
 import { autoStatus } from '../shared/status.ts';
 import type { DB } from './db.ts';
+import { loggedToday, reminderRules, rulesDue } from './nudges.ts';
 import { decode, type Row } from './store.ts';
 
 export const STEP_COLS = { json: ['params'] } as const;
@@ -174,19 +175,40 @@ export function loadBatch(db: DB, id: string, ctx: ViewContext) {
 export function listBatches(db: DB, ctx: ViewContext) {
   const rows = db
     .prepare(
-      `SELECT b.*,
-              (SELECT s.date FROM steps s WHERE s.batch_id = b.id AND s.type = 'ferment'
-                ORDER BY s.position LIMIT 1) AS ferment_date
+      `SELECT b.*, f.date AS ferment_date, json_extract(f.params, '$.needs_burping') AS needs_burping
          FROM batches b
+         LEFT JOIN steps f ON f.id = (SELECT s.id FROM steps s WHERE s.batch_id = b.id AND s.type = 'ferment'
+                                       ORDER BY s.position LIMIT 1)
         WHERE b.deleted_at IS NULL
         ORDER BY b.number DESC`,
     )
     .all() as Row[];
   const now = today(ctx);
-  return rows.map((r) => ({
-    ...decode(r, BATCH_COLS),
-    ferment_day: r.status === 'fermenting' && typeof r.ferment_date === 'string' ? daysBetween(r.ferment_date, now) : null,
-  }));
+  const rules = reminderRules(db);
+  return rows.map(({ needs_burping, ...r }) => {
+    const fermentDay = r.status === 'fermenting' && typeof r.ferment_date === 'string' ? daysBetween(r.ferment_date, now) : null;
+    return {
+      ...decode(r, BATCH_COLS),
+      ferment_day: fermentDay,
+      // What the reminder rules still ask of it today, for the list (SPEC §15.13).
+      due:
+        fermentDay === null
+          ? []
+          : dueToday(rulesDue(rules, fermentDay + 1, needs_burping === 1, loggedToday(db, r.id as string, ctx.now, ctx.timeZone))),
+    };
+  });
+}
+
+/** One entry per action; own-text rules each keep their text. */
+function dueToday(rules: Pick<ReminderRule, 'action' | 'text'>[]): { action: ReminderAction; text: string | null }[] {
+  const seen = new Set<string>();
+  return rules.flatMap((r) => {
+    const text = r.action === 'custom' ? (r.text ?? '') : null;
+    const key = `${r.action}:${text ?? ''}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ action: r.action, text }];
+  });
 }
 
 /** Recomputes the automatic status (SPEC §6.3) unless it was set by hand. */

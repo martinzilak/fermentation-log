@@ -214,6 +214,7 @@ export function overlayList(data: BatchSummary[] | undefined, ops: readonly Op[]
         status: 'planned',
         ferment_date: null,
         ferment_day: null,
+        due: [],
       };
       list = [...list, created].sort((a, b) => b.number - a.number);
     } else if (list && !sub && op.method === 'DELETE') list = list.filter((b) => b.id !== id);
