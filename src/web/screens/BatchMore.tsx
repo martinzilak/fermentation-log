@@ -1,6 +1,6 @@
 // The batch detail's More (SPEC §8.2 item 3): the less frequent events
-// (weigh, burp, issue, tasting), bottling, the edit screen and the export of
-// this one batch.
+// (weigh, burp, issue, tasting), bottling, the edit screen, the export of
+// this one batch and saving it as a recipe (SPEC §7.3).
 import { useState } from 'react';
 import { ISSUE_KINDS } from '../../shared/schemas.ts';
 import { Chip, Chips } from '@/components/Chip';
@@ -10,7 +10,7 @@ import { ActionRow, Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { api } from '@/lib/api';
+import { api, QUEUED } from '@/lib/api';
 import { stars } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { formatGrams, parseDecimal } from '@/lib/numbers';
@@ -37,8 +37,20 @@ function useLogEvent(batchId: string) {
 export function BatchMore({ id }: { id: string }) {
   const batch = useQuery<BatchView>(`/api/batches/${id}`).data;
   const log = useLogEvent(id);
+  const toast = useToast();
   const bottled = batch?.status === 'bottled' || batch?.status === 'archived';
   const big = 'h-20 text-xl';
+
+  async function saveAsRecipe() {
+    const recipeId = crypto.randomUUID();
+    const saved = await toast.run(() => api.post(`/api/batches/${id}/save-as-recipe`, { id: recipeId }));
+    if (!saved) return;
+    invalidate('/api/recipes');
+    // Offline it is created once the server is back; the recipe isn't there to open yet.
+    if (saved === QUEUED) return toast.show(t('recipe.savedLater'));
+    navigate(`/recipes/${recipeId}`, { replace: true });
+    toast.show(t('recipe.savedFromBatch'));
+  }
   return (
     <Screen
       title={t('more.title')}
@@ -69,6 +81,9 @@ export function BatchMore({ id }: { id: string }) {
         )}
         <Button variant="outline" className={`${big} col-span-2`} onClick={() => navigate(`/b/${id}/edit`, { replace: true })}>
           {t('batchEdit.open')}
+        </Button>
+        <Button variant="outline" className={`${big} col-span-2`} onClick={() => void saveAsRecipe()}>
+          {t('recipe.saveFromBatch')}
         </Button>
         <Button asChild variant="outline" className={`${big} col-span-2`}>
           <a href={`/api/batches/${id}/export.md`} download>
