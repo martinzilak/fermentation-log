@@ -189,7 +189,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
             <section key={s.id} className="mb-3 rounded-xl border bg-card px-4 py-3">
               <h2 className="text-xl font-semibold">{stepTypeLabel(s.type)}</h2>
               <p className="text-lg text-muted-foreground">
-                {s.lines.map((l) => `${l.name} ${l.grams === null ? '—' : formatGrams(l.grams)}`).join(' · ') || t('bottle.noLines')}
+                {s.lines.map((l) => `${l.name} ${l.grams === null ? t('bottle.notWeighed') : formatGrams(l.grams)}`).join(' · ') || t('bottle.noLines')}
               </p>
             </section>
           ))}

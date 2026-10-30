@@ -298,6 +298,7 @@ const en = {
   'bottle.checkTitle': 'Are all the additions in?',
   'bottle.checkHint': 'Check each step is complete before bottling.',
   'bottle.noLines': 'Nothing added',
+  'bottle.notWeighed': '(not weighed)',
   'bottle.allIn': 'All in',
   'bottle.fillsTitle': 'Which bottles?',
   'bottle.addFill': 'Add bottles',

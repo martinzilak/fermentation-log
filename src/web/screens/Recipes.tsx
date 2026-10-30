@@ -94,7 +94,7 @@ function defaultAmount(kind: Kind, stepType: StepType, saltPct: number): Pick<Re
   return { mode: 'percent', grams: null, percent: 0, base: kind === 'thickener' ? 'sauce' : 'mash' };
 }
 
-const selectClass = 'h-14 w-full min-w-0 rounded-xl border border-input bg-transparent px-3 text-lg dark:bg-input/30';
+const selectClass = 'h-14 w-full min-w-0 rounded-xl border border-input bg-card px-3 text-lg';
 
 export function RecipeEditor({ id }: { id: string }) {
   const { data, error } = useQuery<RecipeView[]>(LIST);
@@ -260,8 +260,9 @@ function LineCard({
   // "grams", or the base of a percentage.
   const amountMode = l.mode === 'percent' && l.base ? l.base : 'grams';
   return (
+    // On a phone: name and remove, then kind and amount, then the number. On a wide screen, one row.
     <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3 rounded-xl border bg-card p-3 md:grid-cols-[2fr_1fr_1.5fr_1fr_auto]">
-      <div className="col-span-3 md:col-span-1">
+      <div className="col-span-2 md:col-span-1">
         <TextField
           label={t('recipe.ingredient')}
           value={l.name}
@@ -270,6 +271,15 @@ function LineCard({
           onSave={(name) => onChange(identify(name!) ?? { name: name!, variety_id: null, catalog_id: null })}
         />
       </div>
+      <Button
+        variant="outline"
+        size="icon"
+        className="md:order-last"
+        aria-label={t('recipe.removeLine', { name: l.name })}
+        onClick={() => void onRemove()}
+      >
+        <Trash2 />
+      </Button>
       <label className="block">
         <span className="mb-1 block text-lg text-muted-foreground">{t('recipe.kind')}</span>
         <select
@@ -307,9 +317,9 @@ function LineCard({
         </select>
       </label>
       {l.solve_for_heat ? (
-        <p className="col-span-2 flex h-14 items-center text-lg text-muted-foreground md:col-span-1">{t('recipe.solved')}</p>
+        <p className="col-span-3 flex h-14 items-center text-lg text-muted-foreground md:col-span-1">{t('recipe.solved')}</p>
       ) : (
-        <div className="col-span-2 md:col-span-1">
+        <div className="col-span-3 md:col-span-1">
           {l.mode === 'grams' ? (
             <NumberField label={t('recipe.grams')} value={l.grams} onSave={(grams) => onChange({ grams })} />
           ) : (
@@ -317,19 +327,10 @@ function LineCard({
           )}
         </div>
       )}
-      <Button variant="outline" size="icon" aria-label={t('recipe.removeLine', { name: l.name })} onClick={() => void onRemove()}>
-        <Trash2 />
-      </Button>
       {l.mode === 'grams' && (
-        <label className="col-span-3 flex items-center gap-3 text-lg md:col-span-5">
-          <input
-            type="checkbox"
-            className="size-6"
-            checked={l.solve_for_heat}
-            onChange={(e) => void onChange({ solve_for_heat: e.target.checked })}
-          />
+        <Chip selected={l.solve_for_heat} className="col-span-3 w-full md:col-span-5" onClick={() => void onChange({ solve_for_heat: !l.solve_for_heat })}>
           {t('recipe.solveForHeat')}
-        </label>
+        </Chip>
       )}
     </div>
   );
