@@ -328,16 +328,17 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
             onChange={(e) => setQuery(e.target.value)}
           />
           <Chips>
-            {q && !exact && (
-              <Chip onClick={() => choose({ name: q, kind: null, catalog_id: null, variety_id: null, note: null })}>
-                {t('weigh.useName', { name: q })}
-              </Chip>
-            )}
             {chips.map((o) => (
               <Chip key={`${o.name}|${o.kind}`} hint={kindHint(o)} onClick={() => choose(o)}>
                 {o.name}
               </Chip>
             ))}
+            {/* Last, so a typo meets the entry it meant before a new spelling of it. */}
+            {q && !exact && (
+              <Chip onClick={() => choose({ name: q, kind: null, catalog_id: null, variety_id: null, note: null })}>
+                {t('weigh.useName', { name: q })}
+              </Chip>
+            )}
           </Chips>
           {added.length > 0 && (
             <section className="mt-6">

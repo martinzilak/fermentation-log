@@ -72,6 +72,14 @@ const sources: Sources = {
 const names = (query: string, stepType?: 'ferment' | 'blend') => suggest(query, sources, stepType).options.map((s) => s.name);
 
 describe('ingredient suggestions', () => {
+  it('finds an entry despite a typo, but not from a short query', () => {
+    expect(names('garlik')).toContain('Garlic');
+    expect(names('habanro')).toContain('Habanero Yellow');
+    expect(names('jalpeno')).toContain('Jalapeño Red');
+    expect(names('gar')).not.toContain('Salt');
+    expect(names('xyzzy')).toEqual([]);
+  });
+
   it('offers the entries this step type usually takes first, once each', () => {
     expect(names('', 'ferment')).toEqual(['Salt', 'Sparkler', 'Garlic', VINEGAR, 'Habanero Yellow', 'Jalapeño Red']);
     expect(names('', 'blend')).toEqual(['Garlic', VINEGAR, 'Salt', 'Sparkler', 'Habanero Yellow', 'Jalapeño Red']);

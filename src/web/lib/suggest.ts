@@ -4,7 +4,8 @@
 // matches the kind and the aliases ("soľ" finds Salt); an alias resolves to
 // the entry's name and keeps what was typed in the note (SPEC §6.2). Before
 // anything is typed, only a few chips show: the entries this kind of step
-// usually takes, most recent first.
+// usually takes, most recent first. A typo still finds the entry: a name, a
+// word of it or its start within one or two letters of the query comes last.
 import { fold } from '../../shared/names.ts';
 import type { Kind, StepType } from '../../shared/schemas.ts';
 import { kindLabel } from './i18n.ts';
@@ -58,11 +59,30 @@ export interface Suggestions {
   exact: boolean;
 }
 
+/** Edits (insert, delete, change) between two strings. */
+export function editDistance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j]! + 1, row[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[b.length]!;
+}
+
+/** "carots" for Carrot, "jalpeno" for Jalapeño Red; short queries are too ambiguous. */
+function closeTo(q: string, terms: string[]): boolean {
+  if (q.length < 4) return false;
+  const allowed = q.length < 6 ? 1 : 2;
+  const words = terms.flatMap((term) => [term, term.slice(0, q.length), ...term.split(/\s+/)]);
+  return words.some((w) => w.length >= 3 && editDistance(q, w) <= allowed);
+}
+
 export function suggest(query: string, sources: Sources, stepType?: StepType): Suggestions {
   const q = fold(query);
   const seen = new Set<string>();
-  // Ranked buckets: exact name or alias, then prefix, then anywhere.
-  const ranked: [Pick[], Pick[], Pick[]] = [[], [], []];
+  // Ranked buckets: exact name or alias, then prefix, then anywhere, then a close spelling.
+  const ranked: [Pick[], Pick[], Pick[], Pick[]] = [[], [], [], []];
   for (const { pick, aliases } of candidates(sources, stepType)) {
     const key = pick.catalog_id ?? pick.variety_id ?? `${fold(pick.name)}|${pick.kind}`;
     if (seen.has(key)) continue;
@@ -80,6 +100,7 @@ export function suggest(query: string, sources: Sources, stepType?: StepType): S
     const terms = [name, ...aliases.map(fold), ...(pick.kind ? [fold(kindLabel(pick.kind))] : [])];
     if (terms.some((term) => term.startsWith(q))) ranked[1].push(pick);
     else if (terms.some((term) => term.includes(q))) ranked[2].push(pick);
+    else if (closeTo(q, [name, ...aliases.map(fold)])) ranked[3].push(pick);
   }
   return {
     options: ranked.flat().slice(0, q ? SEARCH_LIMIT : IDLE_LIMIT),

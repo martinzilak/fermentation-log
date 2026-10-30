@@ -401,11 +401,6 @@ export function LineEdit({ batchId, lineId }: { batchId: string; lineId: string 
         {query.trim() && (
           <div className="mt-3">
             <Chips>
-              {typed && !exact && (
-                <Chip onClick={() => void change({ name: typed, kind: l.kind, catalog_id: null, variety_id: null, note: null })}>
-                  {t('weigh.useName', { name: typed })}
-                </Chip>
-              )}
               {options
                 .filter((o) => (o.catalog_id ?? o.variety_id) !== (l.catalog_id ?? l.variety_id))
                 .map((o) => (
@@ -413,6 +408,12 @@ export function LineEdit({ batchId, lineId }: { batchId: string; lineId: string 
                     {o.name}
                   </Chip>
                 ))}
+              {/* Last, so a typo meets the entry it meant before a new spelling of it. */}
+              {typed && !exact && (
+                <Chip onClick={() => void change({ name: typed, kind: l.kind, catalog_id: null, variety_id: null, note: null })}>
+                  {t('weigh.useName', { name: typed })}
+                </Chip>
+              )}
             </Chips>
           </div>
         )}
