@@ -368,7 +368,7 @@ const en = {
   'weigh.lessThanContainer': 'That’s less than the container weight.',
   'weigh.saltNow': 'Salt {pct}',
   'weigh.suggested': 'Suggested salt {g} for {pct}',
-  'weigh.aim': 'aim {g}',
+  'weigh.aim': 'salt aim {g}',
   'weigh.additions': 'Additions {g}',
   'weigh.sauce': 'Sauce {g}',
   'weigh.about': 'About',
