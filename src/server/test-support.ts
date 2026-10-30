@@ -7,11 +7,13 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { migrate, openDb } from './db.ts';
 import type { PeerResolver } from './auth.ts';
+import type { PushSender } from './push.ts';
 
 export function testApp(
   env: NodeJS.ProcessEnv = { DEV_USER: 'cook@example.com' },
   getPeer?: PeerResolver,
   webDir?: string,
+  push?: PushSender | null,
 ) {
   const db = openDb(':memory:');
   migrate(db);
@@ -24,6 +26,7 @@ export function testApp(
     now: () => now,
     ...(getPeer ? { getPeer } : {}),
     ...(webDir ? { webDir } : {}),
+    ...(push !== undefined ? { push } : {}),
   });
 
   async function call(method: string, url: string, body?: unknown) {

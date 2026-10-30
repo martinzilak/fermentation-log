@@ -7,7 +7,9 @@ import type { DB } from './db.ts';
 import { ApiError, type AppContext } from './http.ts';
 import { batchRoutes } from './routes/batches.ts';
 import { exportRoutes } from './routes/export.ts';
+import { webPushSender, type PushSender } from './push.ts';
 import { mediaRoutes } from './routes/media.ts';
+import { pushRoutes } from './routes/push.ts';
 import { recipeRoutes } from './routes/recipes.ts';
 import { referenceRoutes } from './routes/reference.ts';
 import { webRoutes } from './routes/web.ts';
@@ -39,10 +41,12 @@ export interface AppDeps {
   webDir?: string;
   getPeer?: PeerResolver;
   now?: () => Date;
+  /** Sends Web Push; by default through the push services, when the VAPID keys are set. */
+  push?: PushSender | null;
 }
 
-export function createApp({ config, db, mediaDir, webDir, getPeer = defaultPeer, now = () => new Date() }: AppDeps) {
-  const ctx: AppContext = { config, db, mediaDir, now };
+export function createApp({ config, db, mediaDir, webDir, getPeer = defaultPeer, now = () => new Date(), push }: AppDeps) {
+  const ctx: AppContext = { config, db, mediaDir, now, push: push === undefined ? (config.vapid ? webPushSender(config.vapid) : null) : push };
   const app = new Hono<AppEnv>();
 
   app.get('/healthz', (c) => c.text('ok'));
@@ -54,6 +58,7 @@ export function createApp({ config, db, mediaDir, webDir, getPeer = defaultPeer,
   app.route('/api', referenceRoutes(ctx));
   app.route('/api', exportRoutes(ctx));
   app.route('/api', recipeRoutes(ctx));
+  app.route('/api', pushRoutes(ctx));
   app.route('/', mediaRoutes(ctx));
 
   if (webDir) app.route('/', webRoutes(webDir));

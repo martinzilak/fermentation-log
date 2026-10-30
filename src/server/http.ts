@@ -5,12 +5,15 @@ import type * as v from 'valibot';
 import type { AppEnv } from './auth.ts';
 import type { Config } from './config.ts';
 import type { DB } from './db.ts';
+import type { PushSender } from './push.ts';
 
 export interface AppContext {
   config: Config;
   db: DB;
   mediaDir: string;
   now: () => Date;
+  /** null when the VAPID keys aren't set. */
+  push: PushSender | null;
 }
 
 export interface Issue {

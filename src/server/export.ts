@@ -235,7 +235,8 @@ const LIVE_ROWS: Record<string, string> = {
 /** Every table's rows as stored, JSON columns still as text. */
 export function dumpTables(db: DB): Record<string, Row[]> {
   const tables = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+    // Push subscriptions are a device's address, not part of the record.
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'push_subscriptions' ORDER BY name")
     .pluck()
     .all() as string[];
   return Object.fromEntries(tables.map((t) => [t, db.prepare(`SELECT * FROM ${t} ${LIVE_ROWS[t] ?? ''} ORDER BY rowid`).all() as Row[]]));

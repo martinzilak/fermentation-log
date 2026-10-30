@@ -9,6 +9,8 @@ export interface Config {
   production: boolean;
   /** IANA zone for dates and day counts (TZ). */
   timeZone: string;
+  /** Web Push keys (SPEC §9); without them reminders are off. */
+  vapid: { publicKey: string; privateKey: string; subject: string } | null;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -40,6 +42,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`Invalid TZ: ${timeZone}`);
   }
 
+  const vapidKeys = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT].map((k) => k?.trim() || '');
+  const vapidSet = vapidKeys.filter(Boolean).length;
+  if (vapidSet > 0 && vapidSet < 3) {
+    throw new Error('Set all of VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT, or none of them.');
+  }
+  const [publicKey, privateKey, subject] = vapidKeys as [string, string, string];
+  if (vapidSet && !/^(mailto:|https:)/.test(subject)) {
+    throw new Error('VAPID_SUBJECT must be a mailto: or https: URL.');
+  }
+
   return {
     port,
     bindHost: env.BIND_HOST || '127.0.0.1',
@@ -48,5 +60,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     devUser,
     production,
     timeZone,
+    vapid: vapidSet ? { publicKey, privateKey, subject } : null,
   };
 }

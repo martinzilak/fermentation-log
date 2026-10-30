@@ -7,6 +7,8 @@ import { snapshot } from './backup.ts';
 import { loadConfig } from './config.ts';
 import { migrate, openDb } from './db.ts';
 import { startNightly } from './nightly.ts';
+import { startNudges } from './nudges.ts';
+import { webPushSender } from './push.ts';
 
 const STARTUP_BACKUPS_KEPT = 10;
 
@@ -36,21 +38,27 @@ if (config.devUser) console.warn(`DEV MODE: every request acts as ${config.devUs
 
 // dist/web relative to the package root, from both src/server and dist/server.
 const webDir = fileURLToPath(new URL('../../dist/web', import.meta.url));
+const push = config.vapid ? webPushSender(config.vapid) : null;
+if (!push) console.log('Reminders are off: VAPID keys are not set.');
 const app = createApp({
   config,
   db,
+  push,
   mediaDir: path.join(config.dataDir, 'media'),
   ...(fs.existsSync(path.join(webDir, 'index.html')) ? { webDir } : {}),
 });
 let stopNightly = () => {};
+let stopNudges = () => {};
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.bindHost }, (info) => {
   console.log(`Listening on ${info.address}:${info.port}`);
   stopNightly = startNightly({ db, dataDir: config.dataDir, mediaDir: path.join(config.dataDir, 'media'), timeZone: config.timeZone });
+  if (push) stopNudges = startNudges({ db, timeZone: config.timeZone, send: push });
 });
 
 function shutdown(signal: string) {
   console.log(`${signal} received, shutting down`);
   stopNightly();
+  stopNudges();
   server.close(() => {
     db.close();
     process.exit(0);

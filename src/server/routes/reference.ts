@@ -40,8 +40,15 @@ const RESOURCES: Resource[] = [
   { path: 'vessels', table: 'vessels', what: 'Vessel', schema: Vessel, cols: {}, order: 'name COLLATE NOCASE' },
 ];
 
+const Flag = v.optional(v.picklist([0, 1]));
 const Settings = v.object({
   target_salt_pct: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(30))),
+  // Reminders (SPEC §9): the hour they start, outside the quiet hours 22:00–08:00.
+  nudge_hour: v.optional(v.pipe(v.number(), v.integer(), v.minValue(8), v.maxValue(21))),
+  nudge_day0_photo: Flag,
+  nudge_checks: Flag,
+  nudge_burp: Flag,
+  nudge_ready_days: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
 });
 
 export function referenceRoutes(ctx: AppContext) {

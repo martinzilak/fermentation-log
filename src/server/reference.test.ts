@@ -50,8 +50,8 @@ describe('reference data and settings', () => {
   });
 
   it('reads and updates the target salt percentage', async () => {
-    expect((await t.call('GET', '/api/settings')).body).toEqual({ target_salt_pct: 3 });
-    expect((await t.call('PATCH', '/api/settings', { target_salt_pct: 2.5 })).body).toEqual({ target_salt_pct: 2.5 });
+    expect((await t.call('GET', '/api/settings')).body).toMatchObject({ target_salt_pct: 3, nudge_hour: 18 });
+    expect((await t.call('PATCH', '/api/settings', { target_salt_pct: 2.5 })).body).toMatchObject({ target_salt_pct: 2.5 });
   });
   it('resolves SHU from the variety through the lot', async () => {
     const variety = (await t.call('POST', '/api/varieties', { id: id(), name: 'Habanero', shu_min: 100000, shu_max: 350000 })).body;

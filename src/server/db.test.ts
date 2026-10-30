@@ -172,7 +172,7 @@ describe('snapshot', () => {
       'ferment-startup-20261029-120004.db',
     ]);
     const copy = openDb(path.join(backups, files[2]!));
-    expect(copy.prepare('SELECT count(*) FROM settings').pluck().get()).toBe(1);
+    expect(copy.prepare("SELECT value FROM settings WHERE key = 'target_salt_pct'").pluck().get()).toBe('3.0');
     copy.close();
     db.close();
   });

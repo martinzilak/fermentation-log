@@ -17,7 +17,7 @@ export interface NightlyDeps {
   timeZone: string;
 }
 
-function wallClock(t: number, timeZone: string) {
+export function wallClock(t: number, timeZone: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
       timeZone,
