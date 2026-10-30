@@ -107,7 +107,7 @@ export function Reminders() {
           {rules.map((r, i) => (
             <div key={r.id} className="rounded-xl border bg-card p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-medium">{t('reminders.rule', { n: i + 1 })}</h3>
+                <h3 className="font-display text-xl font-bold tracking-wide uppercase">{t('reminders.rule', { n: i + 1 })}</h3>
                 <Button
                   variant="ghost"
                   size="icon"

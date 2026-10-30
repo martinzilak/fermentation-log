@@ -83,7 +83,7 @@ export function TextField({ label, value, onSave, multiline = false, required = 
   };
   return (
     <label className="block">
-      <span className="mb-1 block text-lg text-muted-foreground">{label}</span>
+      <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{label}</span>
       {multiline ? (
         <Textarea {...common} onChange={(e) => setText(e.target.value)} />
       ) : (
@@ -121,7 +121,7 @@ export function DateField({ label, value, onSave }: { label: string; value: stri
 
   return (
     <label className="block">
-      <span className="mb-1 block text-lg text-muted-foreground">{label}</span>
+      <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{label}</span>
       <span className="relative flex h-14 items-center overflow-hidden rounded-xl border border-input px-4 text-lg shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
         {date ? formatDay(date) : <span className="text-muted-foreground">{t('edit.noDate')}</span>}
         <input

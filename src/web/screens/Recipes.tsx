@@ -193,7 +193,7 @@ export function RecipeEditor({ id }: { id: string }) {
       {steps.map((s, i) => (
         <Section
           key={s.step_index}
-          title={<span className="text-xl font-semibold text-foreground">{t('recipe.step', { n: i + 1, type: stepTypeLabel(s.type) })}</span>}
+          title={<span className="font-display text-2xl font-extrabold tracking-wide text-foreground">{t('recipe.step', { n: i + 1, type: stepTypeLabel(s.type) })}</span>}
         >
           <div className="mb-3">
             <TextField
@@ -281,7 +281,7 @@ function LineCard({
         <Trash2 />
       </Button>
       <label className="block">
-        <span className="mb-1 block text-lg text-muted-foreground">{t('recipe.kind')}</span>
+        <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('recipe.kind')}</span>
         <select
           className={selectClass}
           value={l.kind}
@@ -295,7 +295,7 @@ function LineCard({
         </select>
       </label>
       <label className="col-span-2 block md:col-span-1">
-        <span className="mb-1 block text-lg text-muted-foreground">{t('recipe.amountIn')}</span>
+        <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('recipe.amountIn')}</span>
         <select
           className={selectClass}
           value={amountMode}
@@ -397,7 +397,7 @@ function Calculator({ recipe }: { recipe: RecipeView }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {fixed.map((l) => (
               <label key={l.id} className="block">
-                <span className="mb-1 block text-lg text-muted-foreground">{t('recipe.youHave', { name: l.name })}</span>
+                <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('recipe.youHave', { name: l.name })}</span>
                 <Input
                   inputMode="decimal"
                   placeholder={l.grams === null ? '' : formatNumber(l.grams)}
@@ -408,7 +408,7 @@ function Calculator({ recipe }: { recipe: RecipeView }) {
             ))}
             {needsMash && (
               <label className="block">
-                <span className="mb-1 block text-lg text-muted-foreground">{t('recipe.mashWeighed')}</span>
+                <span className="mb-1 block font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('recipe.mashWeighed')}</span>
                 <Input inputMode="decimal" value={mash} onChange={(ev) => setMash(ev.target.value)} />
               </label>
             )}
