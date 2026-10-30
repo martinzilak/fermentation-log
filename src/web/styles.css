@@ -7,63 +7,85 @@
 /* Installed to the Home Screen. */
 @custom-variant standalone (@media (display-mode: standalone));
 
-/* shadcn/ui tokens (stone), with a chilli-red primary. */
+/*
+ * Theme (SPEC §15.12): matte black and bone white, one chilli orange for the
+ * main action of a screen, and neon blocks for the live states of a batch.
+ * The token names are shadcn/ui's, so the components follow on their own.
+ */
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.985 0.001 106.423);
-  --foreground: oklch(0.147 0.004 49.25);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.444 0.177 26.899);
-  --primary-foreground: oklch(0.985 0.001 106.423);
-  --secondary: oklch(0.923 0.003 48.717);
-  --secondary-foreground: oklch(0.216 0.006 56.043);
-  --muted: oklch(0.97 0.001 106.424);
-  --muted-foreground: oklch(0.444 0.011 73.639);
-  --accent: oklch(0.923 0.003 48.717);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.869 0.005 56.366);
-  --input: oklch(0.709 0.01 56.259);
-  --ring: oklch(0.444 0.177 26.899);
-  --ok: oklch(0.527 0.154 150.069);
-  --warn: oklch(0.666 0.179 58.318);
-  --danger: oklch(0.577 0.245 27.325);
+  --background: #f4f2ee;
+  --foreground: #0b0b0c;
+  --card: #ffffff;
+  --card-foreground: #0b0b0c;
+  --popover: #ffffff;
+  --popover-foreground: #0b0b0c;
+  --primary: #c42b12;
+  --primary-foreground: #ffffff;
+  --secondary: #e9e6e0;
+  --secondary-foreground: #0b0b0c;
+  --muted: #edeae4;
+  --muted-foreground: #5e5b55;
+  --accent: #dedad2;
+  --accent-foreground: #0b0b0c;
+  --destructive: #c8102e;
+  --border: #d8d4cc;
+  --input: #8a857c;
+  --ring: #c42b12;
+  --ok: #08734d;
+  --warn: #9a5b00;
+  --danger: #c8102e;
+  /* A picked chip: inverted, never the action colour. */
+  --selected: #0b0b0c;
+  --selected-foreground: #f4f2ee;
+  /* Batch states: neon blocks with black text, the same in both themes. */
+  --fermenting: #c6f432;
+  --processing: #2ee6c5;
+  --on-state: #0a0a0a;
+  /* The readout panel is black in both themes, like a scale's display. */
+  --lcd: #0b0b0c;
+  --lcd-foreground: #c6f432;
+  --lcd-muted: #9a9a96;
+  --lcd-tick: #3a3a3e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.147 0.004 49.25);
-    --foreground: oklch(0.985 0.001 106.423);
-    --card: oklch(0.216 0.006 56.043);
-    --card-foreground: oklch(0.985 0.001 106.423);
-    --popover: oklch(0.216 0.006 56.043);
-    --popover-foreground: oklch(0.985 0.001 106.423);
-    --primary: oklch(0.704 0.191 22.216);
-    --primary-foreground: oklch(0.147 0.004 49.25);
-    --secondary: oklch(0.268 0.007 34.298);
-    --secondary-foreground: oklch(0.985 0.001 106.423);
-    --muted: oklch(0.268 0.007 34.298);
-    --muted-foreground: oklch(0.809 0.008 58.071);
-    --accent: oklch(0.374 0.01 67.558);
-    --accent-foreground: oklch(0.985 0.001 106.423);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 18%);
-    --input: oklch(1 0 0 / 30%);
-    --ring: oklch(0.704 0.191 22.216);
-    --ok: oklch(0.792 0.209 151.711);
-    --warn: oklch(0.837 0.164 84.429);
-    --danger: oklch(0.704 0.191 22.216);
+    --background: #0b0b0c;
+    --foreground: #f2f2f0;
+    --card: #151517;
+    --card-foreground: #f2f2f0;
+    --popover: #151517;
+    --popover-foreground: #f2f2f0;
+    --primary: #ff4d2e;
+    --primary-foreground: #0b0b0c;
+    --secondary: #1e1e21;
+    --secondary-foreground: #f2f2f0;
+    --muted: #18181a;
+    --muted-foreground: #9a9a96;
+    --accent: #2a2a2e;
+    --accent-foreground: #f2f2f0;
+    --destructive: #ff4f6a;
+    --border: #2a2a2e;
+    --input: #66666c;
+    --ring: #ff4d2e;
+    --ok: #3ddc84;
+    --warn: #ffb000;
+    --danger: #ff4f6a;
+    --selected: #f2f2f0;
+    --selected-foreground: #0b0b0c;
+    --lcd: #151517;
   }
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Square-ish corners: a label, not a bubble. */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --font-sans: 'Barlow', system-ui, -apple-system, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -85,6 +107,15 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-danger: var(--danger);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-fermenting: var(--fermenting);
+  --color-processing: var(--processing);
+  --color-on-state: var(--on-state);
+  --color-lcd: var(--lcd);
+  --color-lcd-foreground: var(--lcd-foreground);
+  --color-lcd-muted: var(--lcd-muted);
+  --color-lcd-tick: var(--lcd-tick);
 }
 
 @keyframes toast-timer {
