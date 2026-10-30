@@ -1,8 +1,9 @@
 // Planned amounts in a batch started from a recipe (SPEC §7.3). Each batch
 // line from the recipe is matched to its recipe line; the plan follows what
 // has actually been weighed so far, so the salt follows the vegetables you
-// really put in. A line's plan is snapshotted into planned_g when it is weighed.
-import type { CalcStep } from '../../shared/calc.ts';
+// really put in; lines not weighed yet count with their own plan. A line's
+// plan is snapshotted into planned_g when it is weighed.
+import { bases, type CalcStep } from '../../shared/calc.ts';
 import { fold } from '../../shared/names.ts';
 import { evaluateRecipe, planInBatch, recipeStepFor } from '../../shared/recipe.ts';
 import { recipeLineText } from './recipes.ts';
@@ -18,6 +19,11 @@ export function calcSteps(steps: StepView[], without?: string): CalcStep[] {
       .filter((l) => l.id !== without)
       .map((l) => ({ name: l.name, kind: l.kind, grams: l.grams, shu_min: l.shu?.min ?? null, shu_max: l.shu?.max ?? null })),
   }));
+}
+
+/** As calcSteps, with the planned grams standing in for lines not weighed yet. */
+function planSteps(steps: StepView[], without?: string): CalcStep[] {
+  return calcSteps(steps.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, grams: l.grams ?? l.planned_g })) })), without);
 }
 
 /** The recipe lines a batch step follows. */
@@ -41,10 +47,16 @@ export interface Plan {
   pending: boolean;
   /** The recipe's rule, "5 % of peppers", for when its base is still empty. */
   rule?: string;
+  /** What to expect rather than what to aim for: the mash, which weighs what the ferment's solids did. */
+  estimate?: boolean;
 }
 
 /** The plan for a line: live from the recipe when there is one, else the snapshot. */
 export function planFor(line: LineView, step: StepView, batch: BatchView, recipe: RecipeView | undefined): Plan | null {
+  if (line.kind === 'mash' && line.planned_g === null) {
+    const solids = bases(calcSteps(batch.steps)).solids;
+    return solids > 0 ? { grams: Math.round(solids), pending: false, estimate: true } : null;
+  }
   const r = recipe && recipeLineOf(recipe, batch, step, line);
   if (!r) return line.planned_g === null ? null : { grams: line.planned_g, pending: false };
   if (r.kind === 'mash') return null;
@@ -59,7 +71,8 @@ export function planFor(line: LineView, step: StepView, batch: BatchView, recipe
     const goal = evaluateRecipe(recipe.lines, { grams: weighed, heat_target_shu: recipe.heat_target_shu }).goal;
     return { grams: goal?.status === 'solved' ? goal.grams : null, pending: false };
   }
-  const grams = planInBatch(r, calcSteps(batch.steps, line.id));
+  // Lines still to weigh count with their own plan, so garlic has one before the peppers are in.
+  const grams = planInBatch(r, planSteps(batch.steps, line.id));
   const pending = grams === null && r.mode === 'percent' && (r.base === 'mash' || r.base === 'sauce');
   // Nothing weighed towards its base yet: 0 g would read as "leave it out".
   if (r.mode === 'percent' && !grams) return { grams: null, pending, rule: recipeLineText(r) };

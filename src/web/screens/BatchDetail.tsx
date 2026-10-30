@@ -11,9 +11,11 @@ import { dayNumber, formatDay, formatStamp, stars } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatMl, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
+import { saltWarning } from '@/lib/salt';
 import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
-import type { Attachment, BatchView, BottleType, EventView, Fill, StepView, Vessel } from '@/lib/types';
+import type { Attachment, BatchView, BottleType, EventView, Fill, Settings, StepView, Vessel } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 
 export function BatchDetail({ id }: { id: string }) {
@@ -21,6 +23,7 @@ export function BatchDetail({ id }: { id: string }) {
   const { data: batch, error } = useQuery<BatchView>(url);
   const vessels = useQuery<Vessel[]>('/api/vessels').data ?? [];
   const bottleTypes = useQuery<BottleType[]>('/api/bottle-types').data ?? [];
+  const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
   const [viewing, setViewing] = useState<Attachment | null>(null);
 
   if (!batch) {
@@ -38,6 +41,10 @@ export function BatchDetail({ id }: { id: string }) {
 
   const d = batch.derived;
   const fermenting = batch.status === 'fermenting';
+  const hasMash = batch.steps.some((s) => s.lines.some((l) => l.kind === 'mash' && l.grams));
+  // Only once something besides salt is in the ferment.
+  const fermentIn = batch.steps.some((s) => s.type === 'ferment' && s.lines.some((l) => l.kind !== 'salt' && l.grams !== null));
+  const saltNote = fermentIn ? saltWarning(d.salt_pct, targetPct) : null;
 
   return (
     <Screen
@@ -76,7 +83,9 @@ export function BatchDetail({ id }: { id: string }) {
       }
     >
       <section className="grid grid-cols-2 gap-3">
-        <Stat label={t('detail.salt')}>{d.salt_pct === null ? '—' : formatPct(d.salt_pct)}</Stat>
+        <Stat label={t('detail.salt')} note={saltNote ?? undefined} warn={saltNote !== null}>
+          {d.salt_pct === null ? '—' : formatPct(d.salt_pct)}
+        </Stat>
         {fermenting && d.ferment_day !== null ? (
           <Stat label={t('detail.day')}>{dayNumber(d.ferment_day)}</Stat>
         ) : (
@@ -91,7 +100,12 @@ export function BatchDetail({ id }: { id: string }) {
             {formatShuRange(d.heat.low, d.heat.high)}
           </Stat>
         )}
-        {d.sauce_additions_g > 0 && <Stat label={t('detail.additions')}>{formatGrams(d.measured_total_g ?? d.sauce_additions_g)}</Stat>}
+        {d.sauce_additions_g > 0 && (
+          // With the mash weighed (or the total measured) it is the whole sauce, not just what was added.
+          <Stat label={t(hasMash || d.measured_total_g !== null ? 'detail.sauce' : 'detail.additions')}>
+            {formatGrams(d.measured_total_g ?? d.sauce_additions_g)}
+          </Stat>
+        )}
         {d.xanthan_pct !== null && <Stat label={t('detail.xanthan')}>{formatPct(d.xanthan_pct, 3)}</Stat>}
         {d.bottled_volume_ml !== null && d.bottled_volume_ml > 0 && (
           <Stat label={t('detail.bottledVolume')}>{formatMl(d.bottled_volume_ml)}</Stat>
@@ -121,12 +135,20 @@ export function BatchDetail({ id }: { id: string }) {
   );
 }
 
-function Stat({ label, children, note, wide = false }: { label: string; children: ReactNode; note?: string | undefined; wide?: boolean }) {
+interface StatProps {
+  label: string;
+  children: ReactNode;
+  note?: string | undefined;
+  wide?: boolean;
+  warn?: boolean;
+}
+
+function Stat({ label, children, note, wide = false, warn = false }: StatProps) {
   return (
-    <div className={wide ? 'col-span-2 rounded-xl border bg-card p-3' : 'rounded-xl border bg-card p-3'}>
+    <div className={cn('rounded-xl border bg-card p-3', wide && 'col-span-2', warn && 'border-destructive')}>
       <p className="text-base text-muted-foreground">{label}</p>
-      <p className="text-3xl font-bold tabular-nums">{children}</p>
-      {note && <p className="mt-1 text-base text-muted-foreground">{note}</p>}
+      <p className={cn('text-3xl font-bold tabular-nums', warn && 'text-destructive')}>{children}</p>
+      {note && <p className={cn('mt-1 text-base', warn ? 'text-destructive' : 'text-muted-foreground')}>{note}</p>}
     </div>
   );
 }

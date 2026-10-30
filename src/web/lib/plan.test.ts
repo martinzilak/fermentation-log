@@ -79,6 +79,18 @@ describe('plans in a batch from a recipe (SPEC §7.3)', () => {
     expect(planFor(garlic, weighed.steps[0]!, weighed, recipe)).toEqual({ grams: 50, pending: false });
   });
 
+  it('counts the peppers still to weigh with their plan', () => {
+    const garlic = line('g', 'Garlic', 'aromatic', null);
+    const planned = batch([{ ...line('j', 'Jalapeño', 'pepper', null), planned_g: 900 }, garlic]);
+    expect(planFor(garlic, planned.steps[0]!, planned, recipe)).toEqual({ grams: 45, pending: false });
+  });
+
+  it('expects the mash to weigh what the ferment’s solids did', () => {
+    const mash = line('m', 'Mash', 'mash', null);
+    const b = batch([line('j', 'Jalapeño', 'pepper', 1000), line('g', 'Garlic', 'aromatic', 50), line('w', 'Water', 'water', 1000)], [mash]);
+    expect(planFor(mash, b.steps[1]!, b, recipe)).toEqual({ grams: 1050, pending: false, estimate: true });
+  });
+
   it('solves the heat line from the peppers actually weighed', () => {
     const hab = line('h', 'Habanero', 'pepper', null);
     const b = batch([line('j', 'Jalapeño', 'pepper', 1000, 0), hab, line('g', 'Garlic', 'aromatic', null)]);

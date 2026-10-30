@@ -24,6 +24,7 @@ import { invalidate, missingTitle, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, LineView, Lot, RecentLine, RecipeView, Settings, StepView, Variety } from '@/lib/types';
+import { saltWarning } from '@/lib/salt';
 import { useWakeLock } from '@/lib/wakelock';
 
 /** `line` is a planned line being weighed, rather than a new one. */
@@ -73,6 +74,10 @@ function lotHow(lot: { origin: Lot['origin']; propagation: Lot['propagation'] })
 const lotLabel = (lot: Lot) => `${lot.season} · ${lotHow(lot)}`;
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
+function mashHint(plan: Plan | null): string {
+  return plan?.grams != null ? t('weigh.mashAbout', { g: formatGrams(plan.grams) }) : t('weigh.mashFirst');
+}
+
 function planText(plan: Plan | null): string {
   if (plan?.grams != null) return t('weigh.plan', { g: formatGrams(plan.grams) });
   if (plan?.pending) return t('weigh.planAfterMash');
@@ -109,6 +114,8 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
 
   const go = (next: Stage) => {
     setValue('');
+    // A container is for one ingredient; the next one starts without it.
+    if (next.name === 'pick') setContainer(null);
     setStage(next);
   };
   const leave = () => goBack(`/b/${batch.id}`);
@@ -128,11 +135,14 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   function liveStats(pending?: CalcLine, compact = false, replaces?: string) {
     const steps = calcSteps(pending, replaces);
     if (step.type !== 'ferment') {
-      return <p className="text-lg text-muted-foreground">{t('weigh.additions', { g: formatGrams(bases(steps).sauce) })}</p>;
+      const { mash, sauce } = bases(steps);
+      return <p className="text-lg text-muted-foreground">{t(mash > 0 ? 'weigh.sauce' : 'weigh.additions', { g: formatGrams(sauce) })}</p>;
     }
     const pct = saltPct(steps);
     const suggested = suggestedSaltG(steps, targetPct);
-    const salt = pct === null ? t('weigh.saltNone') : t('weigh.saltNow', { pct: formatPct(pct) });
+    // Until the salt is in, its 0 % is noise; the aim says what's needed.
+    const saltIn = steps.some((s) => s.type === 'ferment' && s.lines.some((l) => l.kind === 'salt' && (l.grams ?? 0) > 0));
+    const salt = saltIn && pct !== null ? t('weigh.saltNow', { pct: formatPct(pct) }) : null;
     const hint =
       suggested !== null && suggested > 0
         ? t('weigh.suggested', { g: formatGrams(round2(suggested)), pct: formatPct(targetPct) })
@@ -143,7 +153,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     }
     return (
       <div className="text-lg">
-        <p className="text-2xl font-semibold tabular-nums">{salt}</p>
+        {salt && <p className="text-2xl font-semibold tabular-nums">{salt}</p>}
         {hint && <p className="text-muted-foreground tabular-nums">{hint}</p>}
       </div>
     );
@@ -168,7 +178,8 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   /** Weighs a planned line, snapshotting its plan as it stands now. */
   async function savePlanned(pick: Chosen, line: LineView, grams: number) {
     const before = { grams: line.grams, lot_id: line.lot_id, planned_g: line.planned_g };
-    const planned_g = plan(line)?.grams ?? line.planned_g;
+    const p = plan(line);
+    const planned_g = p?.estimate ? line.planned_g : (p?.grams ?? line.planned_g);
     const saved = await toast.run(() => api.patch(`/api/lines/${line.id}`, { grams, lot_id: pick.lot_id, planned_g }));
     if (!saved) return;
     void refresh(batchUrl);
@@ -257,14 +268,20 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
       const toWeigh = step.lines.filter((l) => l.grams === null);
       // A planned ingredient is weighed from its row, not added a second time.
       const chips = options.filter((o) => !toWeigh.some((l) => l.kind === o.kind && fold(l.name) === fold(o.name)));
+      // Said where Done is, once something besides salt is in the jar.
+      const warning =
+        step.type === 'ferment' && step.lines.some((l) => l.kind !== 'salt' && l.grams !== null) ? saltWarning(saltPct(calcSteps()), targetPct) : null;
       return (
         <Screen
           title={t('weigh.whatNext')}
           subtitle={subtitle}
           footer={
-            <Button size="lg" onClick={leave}>
-              {t('common.done')}
-            </Button>
+            <>
+              {warning && <p className="text-xl font-semibold text-destructive">{warning}</p>}
+              <Button size="lg" onClick={leave}>
+                {t('common.done')}
+              </Button>
+            </>
           }
         >
           {liveStats()}
@@ -276,7 +293,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
                   <LinkRow
                     key={l.id}
                     title={l.name}
-                    hint={l.kind === 'mash' ? t('weigh.mashFirst') : planText(plan(l))}
+                    hint={l.kind === 'mash' ? mashHint(plan(l)) : planText(plan(l))}
                     onClick={() => choose({ name: l.name, kind: l.kind, catalog_id: l.catalog_id, variety_id: l.variety_id, note: l.note }, l)}
                   />
                 ))}
@@ -402,6 +419,8 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
       const net = typed === null ? null : container !== null ? typed - container : typed;
       const pending = net !== null && net >= 0 ? { name: pick.name, kind: pick.kind, grams: net, shu_min: null, shu_max: null } : undefined;
       const planned = pick.line ? plan(pick.line) : null;
+      // An estimate (the mash) is no target to hit, so it gets no deviation.
+      const dev = planned?.grams != null && !planned.estimate && net !== null ? deviation(round2(net), planned.grams) : null;
       return (
         // The name sits in the header so the keypad can never push it off screen.
         <Screen
@@ -412,23 +431,29 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           {pick.line ? (
             <div className="flex items-start justify-between gap-4">
               <div>
+                {container !== null && <span className="block text-lg text-muted-foreground">{t('weigh.onScale')}</span>}
                 <Readout value={value} unit="g" />
-                {planned?.grams != null && net !== null && (
-                  <p className="text-xl tabular-nums">{deviation(round2(net), planned.grams)}</p>
-                )}
+                {/* With a container on, the net is what's compared; it gets its own line below. */}
+                {container === null && dev && <p className="text-xl tabular-nums">{dev}</p>}
               </div>
               <p className="text-right">
-                <span className="block text-lg text-muted-foreground">{t('weigh.planLabel')}</span>
+                <span className="block text-lg text-muted-foreground">{t(planned?.estimate ? 'weigh.about' : 'weigh.planLabel')}</span>
                 <span className="text-5xl font-bold tabular-nums">{planned?.grams != null ? formatNumber(planned.grams) : '—'}</span>
                 {planned?.grams != null && <span className="ml-1 text-3xl font-medium text-muted-foreground">g</span>}
                 {planned?.grams == null && <span className="block text-base text-muted-foreground">{planText(planned)}</span>}
               </p>
             </div>
           ) : (
-            <Readout value={value} unit="g" />
+            <>
+              {container !== null && <span className="block text-lg text-muted-foreground">{t('weigh.onScale')}</span>}
+              <Readout value={value} unit="g" />
+            </>
           )}
           {container !== null && net !== null && (
-            <p className="text-2xl font-semibold tabular-nums">{t('weigh.net', { g: formatGrams(round2(net)) })}</p>
+            <p className="mt-2 text-4xl font-bold tabular-nums">
+              {t('weigh.net', { g: formatGrams(round2(net)) })}
+              {dev && <span className="ml-3 text-xl font-normal">{dev}</span>}
+            </p>
           )}
           {container !== null && <p className="mt-1 text-lg text-muted-foreground">{t('weigh.containerHint', { g: formatGrams(container) })}</p>}
           <Button
