@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react';
 import { ConnectionBanner, useBanner } from '@/components/ConnectionBanner';
 import { ToastSlot } from '@/components/Toast';
+import { keepUnits } from '@/lib/caps';
 
 interface Props {
   title: ReactNode;
@@ -26,7 +27,7 @@ export function Screen({ title, subtitle, children, footer }: Props) {
         {banner && <ConnectionBanner state={banner} />}
         {/* The banner, when shown, already clears the notch. */}
         <div className="pb-2" style={{ ...sides, paddingTop: banner ? '1rem' : 'max(1rem, env(safe-area-inset-top))' }}>
-          <h1 className="text-2xl leading-tight font-bold">{title}</h1>
+          <h1 className="font-display text-[1.75rem] leading-[1.05] font-extrabold tracking-wide uppercase">{keepUnits(title)}</h1>
           {subtitle && <div className="mt-1 text-lg text-muted-foreground">{subtitle}</div>}
         </div>
       </header>

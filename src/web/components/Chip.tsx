@@ -14,10 +14,11 @@ interface ChipProps {
 export function Chip({ children, hint, selected = false, onClick, className }: ChipProps) {
   return (
     <Button
-      variant={selected ? 'default' : 'outline'}
+      variant={selected ? 'selected' : 'outline'}
       aria-pressed={selected}
       onClick={onClick}
-      className={cn('h-auto min-h-14 flex-col items-start gap-0 py-2 text-left whitespace-normal', className)}
+      // Choices are names (peppers, people's words), so they keep their case.
+      className={cn('h-auto min-h-14 flex-col items-start gap-0 py-2 text-left font-sans text-lg font-semibold tracking-normal whitespace-normal normal-case', className)}
     >
       <span>{children}</span>
       {hint && <span className={cn('text-base', selected ? 'opacity-80' : 'text-muted-foreground')}>{hint}</span>}
