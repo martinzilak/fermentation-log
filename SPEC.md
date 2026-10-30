@@ -666,3 +666,11 @@ Where this section conflicts with an earlier one, this section wins.
 - **Planned vs actual.** A line's plan follows what has actually been weighed so far: percent lines from the real bases, and the heat line solved with the peppers actually weighed. The plan is snapshotted into `planned_g` when the line is weighed. While a base is still empty, the rule ("5 % of peppers") is shown instead of 0 g.
 - **The recipe editor** saves each change at once with Undo, like the other edit screens; a change to a line sends all the lines (PATCH replaces them). `remainder` lines are not offered. There is no delete for recipes yet.
 - **New lot while weighing** (asked for while testing M4): the lot step shows for every known pepper, with a New lot chip for this season's lot (grown from seed or sapling, bought, gift). New lots go through the outbox, so this works offline.
+
+### 15.9 Recipe steps and the 2026 season
+
+Asked for after M5, when loading the season's planned recipes.
+
+- **Recipe steps** get their own table, `recipe_steps` (`recipe_id`, `step_index`, `type`, `note`), so a recipe can have steps without additions: a cook that only heats, the final strain. The note holds the step's method. A line's step always exists and the line takes its type; PATCH with `steps` replaces them, like `lines`. Migration 0005 gives existing recipes the steps their lines imply. Save batch as recipe keeps every batch step.
+- **Adding a step to a batch from a recipe** offers the recipe's next step first, with its method: the first recipe step the batch has no step for yet, by the n-th-of-a-type matching above.
+- **Migration 0006** deletes every batch the import didn't create (author other than `import`): the batches made in the app before the season were tests. Their photo and voice files stay in `media/`. It then adds the six planned recipes for 2026. Peppers keep the plan's grams; the rest of the ferment is a percentage of the peppers, water of the solids, salt 3 % of the ferment. Later additions are a percentage of the mash, taken to weigh what the ferment's solids do, and xanthan 0.15 % of the sauce. A range takes its middle; the plan's ranges and optional ingredients are in the recipe's notes. Every recipe goes ferment, blend, cook, blend (after cooling, xanthan last), strain.
