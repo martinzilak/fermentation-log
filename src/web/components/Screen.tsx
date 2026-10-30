@@ -3,6 +3,8 @@
 // content scrolls between them. No inner scroll area, so a scroll gesture
 // never has to pick between two. The Undo toast sits just above the actions,
 // and safe-area insets keep standalone mode clear of the notch and home bar.
+// Installed, the screen is at least 100lvh tall: iOS 26 starts a Home Screen
+// app with 100dvh short by the status bar, which left a gap under the footer.
 import type { ReactNode } from 'react';
 import { ConnectionBanner, useBanner } from '@/components/ConnectionBanner';
 import { ToastSlot } from '@/components/Toast';
@@ -19,7 +21,7 @@ const sides = { paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRigh
 export function Screen({ title, subtitle, children, footer }: Props) {
   const banner = useBanner();
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col standalone:min-h-lvh">
       <header className="sticky top-0 z-10 bg-background">
         {banner && <ConnectionBanner state={banner} />}
         {/* The banner, when shown, already clears the notch. */}

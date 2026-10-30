@@ -4,6 +4,9 @@
 /* Dark mode follows the system setting. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
+/* Installed to the Home Screen. */
+@custom-variant standalone (@media (display-mode: standalone));
+
 /* shadcn/ui tokens (stone), with a chilli-red primary. */
 :root {
   --radius: 0.75rem;
