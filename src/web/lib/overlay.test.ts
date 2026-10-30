@@ -94,6 +94,12 @@ describe('overlay of unconfirmed writes (SPEC §8.5)', () => {
     expect(overlay('/api/catalog', catalog, [line('l1', 'Salt', 'salt', 1)], ctx)).toBe(catalog);
   });
 
+  it('lists a lot added while weighing', () => {
+    const lot = { id: 'lot1', variety_id: 'v', season: 2026, origin: 'grown', propagation: 'seed' };
+    const lots = overlay('/api/lots', [], [op('POST', '/api/lots', lot)], ctx) as unknown[];
+    expect(lots).toEqual([{ ...lot, supplier: null, acquired_on: null, uses: 0 }]);
+  });
+
   it('returns the data as is when no write touches the batch', () => {
     const data = batch();
     expect(overlay(url, data, [op('POST', '/api/steps/other/lines', { id: 'x', name: 'Salt', kind: 'salt' })], ctx)).toBe(data);

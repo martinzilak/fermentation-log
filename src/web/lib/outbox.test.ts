@@ -58,6 +58,8 @@ describe('outbox (SPEC §8.5)', () => {
     expect(usesOutbox('DELETE', '/api/lines/x')).toBe(true);
     expect(usesOutbox('POST', '/api/events/x/attachments')).toBe(true);
     expect(usesOutbox('GET', '/api/batches')).toBe(false);
+    expect(usesOutbox('POST', '/api/lots')).toBe(true);
+    expect(usesOutbox('PATCH', '/api/lots/x')).toBe(false);
     expect(usesOutbox('POST', '/api/catalog')).toBe(false);
     expect(usesOutbox('PATCH', '/api/settings')).toBe(false);
   });

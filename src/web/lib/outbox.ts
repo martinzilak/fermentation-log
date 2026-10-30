@@ -1,5 +1,5 @@
 // The write outbox (SPEC §8.5). Batch, step, line, event and attachment
-// writes are stored first and sent in order. When the server can't be
+// writes, and new lots, are stored first and sent in order. When the server can't be
 // reached they stay queued and are retried with backoff; every POST carries a
 // client-generated id, so a write replayed after a lost response is not
 // duplicated. A caller waits while the write can be sent, and gets QUEUED as
@@ -22,8 +22,12 @@ export const QUEUED = Object.freeze({ queued: true as const });
 
 const OUTBOX_URL = /^\/api\/(batches(\/|$)|steps\/|lines\/|events\/)/;
 
-/** Writes to batches and everything in them; reference data is saved directly. */
-export const usesOutbox = (method: string, url: string) => method !== 'GET' && OUTBOX_URL.test(url);
+/**
+ * Writes to batches and everything in them, and new lots, which weighing
+ * creates on the spot; other reference data is saved directly.
+ */
+export const usesOutbox = (method: string, url: string) =>
+  method !== 'GET' && (OUTBOX_URL.test(url) || (method === 'POST' && url === '/api/lots'));
 
 export interface OpStore {
   load(): Promise<Op[]>;

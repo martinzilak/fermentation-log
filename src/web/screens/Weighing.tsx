@@ -29,6 +29,7 @@ type Stage =
   | { name: 'pick' }
   | { name: 'kind'; pick: Pick }
   | { name: 'lot'; pick: Chosen; lots: Lot[] }
+  | { name: 'newLot'; pick: Chosen }
   | { name: 'grams'; pick: Chosen }
   | { name: 'container'; pick: Chosen };
 
@@ -59,10 +60,13 @@ function kindHint(pick: Pick): string | undefined {
   return label.toLocaleLowerCase() === pick.name.toLocaleLowerCase() ? undefined : label;
 }
 
-function lotLabel(lot: Lot): string {
-  const how = [t(`origin.${lot.origin}`), ...(lot.propagation ? [t(`propagation.${lot.propagation}`)] : [])];
-  return `${lot.season} · ${how.join(' ')}`;
+/** "grown from seed", "bought". */
+function lotHow(lot: { origin: Lot['origin']; propagation: Lot['propagation'] }): string {
+  return [t(`origin.${lot.origin}`), ...(lot.propagation ? [t(`propagation.${lot.propagation}`)] : [])].join(' ');
 }
+
+const lotLabel = (lot: Lot) => `${lot.season} · ${lotHow(lot)}`;
+const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
 function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   useWakeLock();
@@ -173,11 +177,19 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   function choose(pick: Pick) {
     if (!pick.kind) return go({ name: 'kind', pick });
     const chosen: Chosen = { ...pick, kind: pick.kind, lot_id: null };
-    if (chosen.kind !== 'pepper') return go({ name: 'grams', pick: chosen });
-    // A new pepper name has no variety or lots yet; the server creates the variety.
+    // A new pepper name has no variety yet; the server creates it with the line.
+    if (chosen.kind !== 'pepper' || !pick.variety_id) return go({ name: 'grams', pick: chosen });
     const own = lots.filter((l) => l.variety_id === pick.variety_id).sort((a, b) => b.season - a.season);
-    if (own.length === 0) return go({ name: 'grams', pick: chosen });
     go({ name: 'lot', pick: chosen, lots: own });
+  }
+
+  /** A lot of this season, made on the spot; its details can be filled in under More. */
+  async function newLot(pick: Chosen, origin: Lot['origin'], propagation: Lot['propagation']) {
+    const id = crypto.randomUUID();
+    const body = { id, variety_id: pick.variety_id, season: new Date().getFullYear(), origin, propagation };
+    if (!(await toast.run(() => api.post('/api/lots', body)))) return;
+    for (const url of ['/api/lots', '/api/varieties']) invalidate(url);
+    go({ name: 'grams', pick: { ...pick, lot_id: id } });
   }
 
   async function nextFromGrams(pick: Chosen) {
@@ -295,8 +307,34 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
                 {lotLabel(lot)}
               </Chip>
             ))}
+            <Chip onClick={() => go({ name: 'newLot', pick })}>{t('weigh.newLot')}</Chip>
             <Chip onClick={() => go({ name: 'grams', pick })}>{t('weigh.noLot')}</Chip>
           </Chips>
+        </Screen>
+      );
+    }
+
+    case 'newLot': {
+      const { pick } = stage;
+      const choices: [Lot['origin'], Lot['propagation']][] = [['grown', 'seed'], ['grown', 'sapling'], ['bought', null], ['gift', null]];
+      return (
+        <Screen
+          title={t('weigh.newLotTitle', { name: pick.name, season: new Date().getFullYear() })}
+          subtitle={subtitle}
+          footer={
+            <Button variant="outline" onClick={() => choose(pick)}>
+              {t('common.back')}
+            </Button>
+          }
+        >
+          <Chips>
+            {choices.map(([origin, propagation]) => (
+              <Chip key={`${origin}-${propagation}`} onClick={() => void newLot(pick, origin, propagation)}>
+                {capitalize(lotHow({ origin, propagation }))}
+              </Chip>
+            ))}
+          </Chips>
+          <p className="mt-4 text-lg text-muted-foreground">{t('weigh.newLotHint')}</p>
         </Screen>
       );
     }

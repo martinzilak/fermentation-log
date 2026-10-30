@@ -6,7 +6,7 @@
 import { derive, type CalcEvent, type CalcStep } from '../../shared/calc.ts';
 import { autoStatus } from '../../shared/status.ts';
 import type { Op } from './outbox.ts';
-import type { BatchSummary, BatchView, EventView, LineView, StepView } from './types.ts';
+import type { BatchSummary, BatchView, EventView, LineView, Lot, StepView } from './types.ts';
 
 export interface OverlayContext {
   timeZone: string;
@@ -222,10 +222,22 @@ export function overlayList(data: BatchSummary[] | undefined, ops: readonly Op[]
   return list;
 }
 
+/** Lots added while weighing, before the server has them. */
+function overlayLots(data: Lot[] | undefined, ops: readonly Op[]): Lot[] | undefined {
+  let lots = data;
+  for (const op of ops) {
+    const body = op.json as (Partial<Lot> & Pick<Lot, 'id' | 'variety_id' | 'season' | 'origin'>) | undefined;
+    if (!lots || op.method !== 'POST' || op.url !== '/api/lots' || !body || lots.some((l) => l.id === body.id)) continue;
+    lots = [...lots, { propagation: null, supplier: null, acquired_on: null, uses: 0, ...body }];
+  }
+  return lots;
+}
+
 /** The cached response for `url` with the unconfirmed writes applied. */
 export function overlay(url: string, data: unknown, ops: readonly Op[], ctx: OverlayContext): unknown {
   if (ops.length === 0) return data;
   if (url === '/api/batches') return overlayList(data as BatchSummary[] | undefined, ops);
+  if (url === '/api/lots') return overlayLots(data as Lot[] | undefined, ops);
   const m = BATCH_VIEW.exec(url);
   return m ? overlayBatch(m[1]!, data as BatchView | undefined, ops, ctx) : data;
 }
