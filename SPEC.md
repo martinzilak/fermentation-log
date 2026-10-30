@@ -725,3 +725,20 @@ After a design review the owner picked a theme between "Matte" (black and bone, 
   - Recipe lines wrap onto rows on a phone instead of cutting off the kind; the heat-goal toggle is a chip.
   - The bottling check says "(not weighed)" when the step additions weren't weighed.
 - **Icons and brands:** no brand marks or third-party logos in the app.
+
+### 15.13 Design review of the new look — 2026-10-30 — **Decided**
+
+The owner took every finding of the persona review of §15.12, and the middle ground where the panel disagreed.
+
+- **Units keep their case in capitals:** pH, and g, kg, ml and l after a number ("PLAN 600 g", never "600 G").
+- **Text sizes:** body text and key figures stay at 18 px or more (§8.1 item 11). Labels, section headings, dates and times may go down to 14 px, never below.
+- **Capitals are for the app's own words** (titles, buttons, headings, labels, menu entries such as Kitchen's). People's data stays as typed in rows and lists (batch, recipe and pepper names). A screen title is set in capitals even when it is a name.
+- **The list says what's due today.** `GET /api/batches` gives each fermenting batch `due`: the reminder rules (§15.11) that fall on its ferment day and aren't done yet, at any hour of the day, one entry per action and one per own text. The row shows them as tags (Photo, Burp, pH, or the own text) under a larger day count; the status there is a slimmer tag, and the batch screen keeps the full block.
+- **The filled button on the batch screen is what comes next:** "Weigh N more" while a step still has lines to weigh (Add step then lives under More, where it always is too); Tasting once bottled; otherwise Add step, which stays a quiet tonal button while the batch ferments.
+- **Salt card:** a dash while there is no salt. While the ferment is still being weighed, or on Day 1, it says "Not in yet" in muted text; after that, no salt is amber. Red is kept for a real reading below or above the target.
+- **Bottling check:** each step lists what was weighed, then names what wasn't once ("Not weighed: …"), with a button to weigh it.
+- **Delete and merge buttons are outlined in red**, not filled, so they never outrank a screen's action.
+- **Tasting** is one row of five keycaps (1–5), the picked rating shown as stars and a word: Off, Meh, Good, Great, Best.
+- **Neon status blocks get a darker edge in light mode** (`--fermenting-edge`, `--processing-edge`), so they hold their shape on white.
+- **The favicon** is the crock without the bubbles, cropped closer; the app icons keep them.
+- **Not done:** moving Batches into the tool row. With Burped on, that row would need six buttons, and each would fall under 56 px (§8.1 item 1).
