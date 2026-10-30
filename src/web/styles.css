@@ -41,6 +41,9 @@
   --fermenting: #c6f432;
   --processing: #2ee6c5;
   --on-state: #0a0a0a;
+  /* A darker edge so the blocks hold their shape on white; none needed in dark. */
+  --fermenting-edge: #8fb21a;
+  --processing-edge: #1fa98f;
   /* The readout panel is black in both themes, like a scale's display. */
   --lcd: #0b0b0c;
   --lcd-foreground: #c6f432;
@@ -74,6 +77,8 @@
     --selected: #f2f2f0;
     --selected-foreground: #0b0b0c;
     --lcd: #151517;
+    --fermenting-edge: #c6f432;
+    --processing-edge: #2ee6c5;
   }
 }
 
@@ -111,6 +116,8 @@
   --color-selected-foreground: var(--selected-foreground);
   --color-fermenting: var(--fermenting);
   --color-processing: var(--processing);
+  --color-fermenting-edge: var(--fermenting-edge);
+  --color-processing-edge: var(--processing-edge);
   --color-on-state: var(--on-state);
   --color-lcd: var(--lcd);
   --color-lcd-foreground: var(--lcd-foreground);

@@ -38,9 +38,9 @@ export function Plate({ number, color, large = false }: { number: number; color:
 // Live states are neon blocks; the rest stay quiet (SPEC §15.12).
 const STATUS_STYLES: Record<BatchStatus, string> = {
   planned: 'border border-foreground text-foreground',
-  fermenting: 'bg-fermenting text-on-state',
-  processing: 'bg-processing text-on-state',
-  bottled: 'bg-secondary text-foreground',
+  fermenting: 'border border-fermenting-edge bg-fermenting text-on-state',
+  processing: 'border border-processing-edge bg-processing text-on-state',
+  bottled: 'border border-transparent bg-secondary text-foreground',
   archived: 'border border-dashed border-input text-muted-foreground',
 };
 
