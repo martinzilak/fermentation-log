@@ -185,14 +185,28 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
           }
         >
           <p className="mb-4 text-lg text-muted-foreground">{t('bottle.checkHint')}</p>
-          {batch.steps.map((s) => (
-            <section key={s.id} className="mb-3 rounded-xl border bg-card px-4 py-3">
-              <h2 className="text-xl font-semibold">{stepTypeLabel(s.type)}</h2>
-              <p className="text-lg text-muted-foreground">
-                {s.lines.map((l) => `${l.name} ${l.grams === null ? t('bottle.notWeighed') : formatGrams(l.grams)}`).join(' · ') || t('bottle.noLines')}
-              </p>
-            </section>
-          ))}
+          {batch.steps.map((s) => {
+            const weighed = s.lines.filter((l) => l.grams !== null);
+            const missing = s.lines.filter((l) => l.grams === null);
+            return (
+              <section key={s.id} className="mb-3 rounded-xl border bg-card px-4 py-3">
+                <h2 className="font-display text-2xl font-extrabold tracking-wide uppercase">{stepTypeLabel(s.type)}</h2>
+                {s.lines.length === 0 && <p className="text-lg text-muted-foreground">{t('bottle.noLines')}</p>}
+                {weighed.length > 0 && (
+                  <p className="text-lg text-muted-foreground">{weighed.map((l) => `${l.name} ${formatGrams(l.grams!)}`).join(' · ')}</p>
+                )}
+                {/* What's missing, said once, with the way to weigh it. */}
+                {missing.length > 0 && (
+                  <>
+                    <p className="mt-2 text-lg font-semibold text-warn">{t('bottle.notWeighed', { names: missing.map((l) => l.name).join(', ') })}</p>
+                    <Button variant="outline" className="mt-2 w-full" onClick={() => navigate(`/b/${batch.id}/s/${s.id}`)}>
+                      {t('bottle.weighThem')}
+                    </Button>
+                  </>
+                )}
+              </section>
+            );
+          })}
         </Screen>
       );
 
