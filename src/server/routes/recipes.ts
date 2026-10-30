@@ -1,11 +1,13 @@
-// Recipes (SPEC §7.3, §11). A recipe is saved whole: PATCH with `lines`
-// replaces all of them. Lines refer to a variety or catalog item like batch
-// lines do, so the heat estimate can use the variety's SHU.
+// Recipes (SPEC §7.3, §11). A recipe is saved whole: PATCH with `steps` or
+// `lines` replaces all of them. Lines refer to a variety or catalog item like
+// batch lines do, so the heat estimate can use the variety's SHU. A step can
+// be empty (a cook, the final strain); a line's step always exists, and takes
+// the step's type.
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import type * as v from 'valibot';
 import { evaluateRecipe, recipeFromBatch, type BatchLineForRecipe, type RecipeLine as EvalLine } from '../../shared/recipe.ts';
-import { Recipe, RecipeEvaluate, SaveAsRecipe, type RecipeLine, type StepType } from '../../shared/schemas.ts';
+import { Recipe, RecipeEvaluate, SaveAsRecipe, type RecipeLine, type RecipeStep, type StepType } from '../../shared/schemas.ts';
 import type { AppEnv } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { resolveLine } from '../entries.ts';
@@ -13,11 +15,13 @@ import { ApiError, jsonBody, meta, type AppContext } from '../http.ts';
 import { getRow, insert, requireRow, update, type Row } from '../store.ts';
 
 type LineBody = v.InferOutput<typeof RecipeLine>;
+type StepBody = v.InferOutput<typeof RecipeStep>;
 type Audit = { now: string; author: string };
 
-export function recipeView(db: DB, id: string): (Row & { heat_target_shu: number | null; lines: Row[] }) | undefined {
+export function recipeView(db: DB, id: string): (Row & { heat_target_shu: number | null; steps: Row[]; lines: Row[] }) | undefined {
   const recipe = getRow(db, 'recipes', id);
   if (!recipe) return undefined;
+  const steps = db.prepare('SELECT step_index, type, note FROM recipe_steps WHERE recipe_id = ? ORDER BY step_index').all(id) as Row[];
   const lines = (
     db
       .prepare(
@@ -27,7 +31,28 @@ export function recipeView(db: DB, id: string): (Row & { heat_target_shu: number
       )
       .all(id) as Row[]
   ).map((l) => ({ ...l, solve_for_heat: Boolean(l.solve_for_heat) }));
-  return { ...recipe, heat_target_shu: recipe.heat_target_shu as number | null, lines };
+  return { ...recipe, heat_target_shu: recipe.heat_target_shu as number | null, steps, lines };
+}
+
+function writeSteps(db: DB, recipeId: string, steps: StepBody[], audit: Audit) {
+  db.prepare('DELETE FROM recipe_steps WHERE recipe_id = ?').run(recipeId);
+  const add = db.prepare(
+    'INSERT INTO recipe_steps (recipe_id, step_index, type, note, created_at, updated_at, author) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (const s of steps) add.run(recipeId, s.step_index, s.type, s.note ?? null, audit.now, audit.now, audit.author);
+}
+
+/** Adds the steps lines refer to but that don't exist, then gives each line its step's type. */
+function settleSteps(db: DB, recipeId: string, audit: Audit) {
+  db.prepare(
+    `INSERT OR IGNORE INTO recipe_steps (recipe_id, step_index, type, created_at, updated_at, author)
+     SELECT recipe_id, step_index, MIN(step_type), ?, ?, ? FROM recipe_lines WHERE recipe_id = ? GROUP BY step_index`,
+  ).run(audit.now, audit.now, audit.author, recipeId);
+  db.prepare(
+    `UPDATE recipe_lines SET step_type = (
+       SELECT s.type FROM recipe_steps s WHERE s.recipe_id = recipe_lines.recipe_id AND s.step_index = recipe_lines.step_index)
+     WHERE recipe_id = ?`,
+  ).run(recipeId);
 }
 
 function writeLines(db: DB, recipeId: string, lines: LineBody[], audit: Audit) {
@@ -70,12 +95,14 @@ export function recipeRoutes(ctx: AppContext) {
   });
 
   r.post('/recipes', jsonBody(Recipe.create), (c) => {
-    const { lines, ...body } = c.req.valid('json');
+    const { steps, lines, ...body } = c.req.valid('json');
     if (getRow(db, 'recipes', body.id)) return c.json(view(body.id), 200);
     const audit = meta(ctx, c);
     db.transaction(() => {
       insert(db, 'recipes', { ...body, created_at: audit.now, updated_at: audit.now, author: audit.author });
+      writeSteps(db, body.id, steps ?? [], audit);
       writeLines(db, body.id, lines ?? [], audit);
+      settleSteps(db, body.id, audit);
     })();
     return c.json(view(body.id), 201);
   });
@@ -89,11 +116,13 @@ export function recipeRoutes(ctx: AppContext) {
   r.patch('/recipes/:id', jsonBody(Recipe.patch), (c) => {
     const id = c.req.param('id');
     requireRow(db, 'recipes', id, 'Recipe');
-    const { lines, ...fields } = c.req.valid('json');
+    const { steps, lines, ...fields } = c.req.valid('json');
     const audit = meta(ctx, c);
     db.transaction(() => {
       update(db, 'recipes', id, { ...fields, updated_at: audit.now });
+      if (steps) writeSteps(db, id, steps, audit);
       if (lines) writeLines(db, id, lines, audit);
+      settleSteps(db, id, audit);
     })();
     return c.json(view(id));
   });
@@ -140,7 +169,10 @@ export function recipeRoutes(ctx: AppContext) {
         updated_at: audit.now,
         author: audit.author,
       });
-      writeLines(db, body.id, recipeFromBatch(steps).map((l) => ({ ...l, id: randomUUID() })), audit);
+      const draft = recipeFromBatch(steps);
+      writeSteps(db, body.id, draft.steps, audit);
+      writeLines(db, body.id, draft.lines.map((l) => ({ ...l, id: randomUUID() })), audit);
+      settleSteps(db, body.id, audit);
     })();
     return c.json(view(body.id), 201);
   });

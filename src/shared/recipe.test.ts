@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Base } from './calc.ts';
-import { evaluateRecipe, planInBatch, recipeFromBatch, recipeStepFor, type RecipeLine } from './recipe.ts';
+import { evaluateRecipe, nextRecipeStep, planInBatch, recipeFromBatch, recipeStepFor, type RecipeLine } from './recipe.ts';
 import type { Kind, StepType } from './schemas.ts';
 
 let n = 0;
@@ -147,10 +147,10 @@ describe('planning a recipe line within a batch', () => {
 
   it('matches the n-th batch step of a type to the n-th recipe step of that type', () => {
     const recipe = [
-      { step_index: 0, step_type: 'ferment' as const },
-      { step_index: 1, step_type: 'blend' as const },
-      { step_index: 2, step_type: 'cook' as const },
-      { step_index: 3, step_type: 'blend' as const },
+      { step_index: 0, type: 'ferment' as const },
+      { step_index: 1, type: 'blend' as const },
+      { step_index: 2, type: 'cook' as const },
+      { step_index: 3, type: 'blend' as const },
     ];
     const batch = [
       { id: 'f', type: 'ferment' as const, position: 0 },
@@ -161,6 +161,19 @@ describe('planning a recipe line within a batch', () => {
     expect(recipeStepFor(recipe, batch, 'b1')).toBe(1);
     expect(recipeStepFor(recipe, batch, 'b2')).toBe(3);
     expect(recipeStepFor(recipe, batch, 's')).toBeNull();
+  });
+
+  it('finds the next recipe step the batch has not reached', () => {
+    const recipe = [
+      { step_index: 0, type: 'ferment' as const },
+      { step_index: 1, type: 'blend' as const },
+      { step_index: 2, type: 'cook' as const },
+      { step_index: 3, type: 'blend' as const },
+      { step_index: 4, type: 'strain' as const },
+    ];
+    expect(nextRecipeStep(recipe, [{ type: 'ferment' }])?.step_index).toBe(1);
+    expect(nextRecipeStep(recipe, [{ type: 'ferment' }, { type: 'blend' }, { type: 'cook' }])?.step_index).toBe(3);
+    expect(nextRecipeStep(recipe, [{ type: 'ferment' }, { type: 'blend' }, { type: 'cook' }, { type: 'blend' }, { type: 'strain' }])).toBeNull();
   });
 });
 
@@ -173,7 +186,7 @@ describe('save batch as recipe (SPEC §7.3)', () => {
   ];
 
   it('keeps pepper grams and turns the rest into percentages of their bases', () => {
-    const draft = recipeFromBatch(batch);
+    const draft = recipeFromBatch(batch).lines;
     expect(draft.map((l) => [l.step_index, l.name, l.mode, l.grams ?? l.percent, l.base])).toEqual([
       [0, 'Habanero', 'grams', 400, null],
       [0, 'Garlic', 'percent', 5, 'peppers'],
@@ -184,8 +197,16 @@ describe('save batch as recipe (SPEC §7.3)', () => {
     ]);
   });
 
+  it('keeps every step, also those without additions', () => {
+    expect(recipeFromBatch(batch).steps).toEqual([
+      { step_index: 0, type: 'ferment', note: null },
+      { step_index: 1, type: 'blend', note: null },
+      { step_index: 2, type: 'rest', note: null },
+    ]);
+  });
+
   it('gives back the batch when evaluated with the same peppers and mash', () => {
-    const draft = recipeFromBatch(batch).map((l, i) => ({ ...l, id: `r${i}`, shu_min: null, shu_max: null }));
+    const draft = recipeFromBatch(batch).lines.map((l, i) => ({ ...l, id: `r${i}`, shu_min: null, shu_max: null }));
     expect(grams(draft, { mash_g: 900 })).toEqual({ Habanero: 400, Garlic: 20, Water: 500, Salt: 27.6, Vinegar: 90, Xanthan: 3 });
   });
 });

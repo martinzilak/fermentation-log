@@ -1,13 +1,14 @@
 // Recipes (SPEC §7.3, §8.2 item 6): the list, and the editor with a live
 // calculator. Like the other edit screens every field saves on its own with
-// Undo; a change to a line saves all the lines, as the API takes them whole.
+// Undo; a change to a line saves all the lines, and a change to a step all the
+// steps, as the API takes them whole.
 // The calculator tries the recipe with the grams you have, and shows the heat
 // against the goal, without saving anything.
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { BASES, KINDS, STEP_TYPES, type Kind, type StepType } from '../../shared/schemas.ts';
 import { fold } from '../../shared/names.ts';
-import { evaluateRecipe, type Evaluation } from '../../shared/recipe.ts';
+import { evaluateRecipe, type Evaluation, type RecipeStep } from '../../shared/recipe.ts';
 import type { Base } from '../../shared/calc.ts';
 import { Chip, Chips } from '@/components/Chip';
 import { LinkRow, NumberField, RowList, Section, TextField, usePatch } from '@/components/Edit';
@@ -101,8 +102,6 @@ export function RecipeEditor({ id }: { id: string }) {
   const catalog = useQuery<CatalogItem[]>('/api/catalog').data ?? [];
   const saltPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
   const save = usePatch(`/api/recipes/${id}`, [LIST]);
-  // Steps added here exist only once they have a line.
-  const [newSteps, setNewSteps] = useState<{ index: number; type: StepType }[]>([]);
   const recipe = data?.find((r) => r.id === id);
   const back = () => goBack('/recipes');
 
@@ -120,7 +119,17 @@ export function RecipeEditor({ id }: { id: string }) {
   }
   const r = recipe;
 
+  // A new recipe starts with its ferment.
+  const steps: RecipeStep[] = r.steps.length > 0 ? r.steps : [{ step_index: 0, type: 'ferment', note: null }];
+  const nextIndex = steps.reduce((max, s) => Math.max(max, s.step_index + 1), 0);
+
   const saveLines = (next: RecipeLineView[]) => save({ lines: next.map(lineBody) }, { lines: r.lines.map(lineBody) });
+  const saveSteps = (next: RecipeStep[]) => save({ steps: next }, { steps: r.steps });
+  const removeStep = (index: number) =>
+    save(
+      { steps: steps.filter((s) => s.step_index !== index), lines: r.lines.filter((l) => l.step_index !== index).map(lineBody) },
+      { steps: r.steps, lines: r.lines.map(lineBody) },
+    );
   const change = (lineId: string, patch: Partial<RecipeLineView>) =>
     saveLines(r.lines.map((l) => (l.id === lineId ? { ...l, ...patch } : patch.solve_for_heat ? { ...l, solve_for_heat: false } : l)));
 
@@ -153,17 +162,8 @@ export function RecipeEditor({ id }: { id: string }) {
       shu_min: null,
       shu_max: null,
     };
-    if (await saveLines([...r.lines, line])) setNewSteps((steps) => steps.filter((s) => s.index !== index));
+    await saveLines([...r.lines, line]);
   }
-
-  const indexes = [...new Set(r.lines.map((l) => l.step_index))];
-  const shown = [
-    ...indexes.map((index) => ({ index, type: r.lines.find((l) => l.step_index === index)!.step_type })),
-    ...newSteps.filter((s) => !indexes.includes(s.index)),
-  ].sort((a, b) => a.index - b.index);
-  // A new recipe starts with its ferment.
-  const steps = shown.length > 0 ? shown : [{ index: 0, type: 'ferment' as StepType }];
-  const nextIndex = steps.reduce((max, s) => Math.max(max, s.index + 1), 0);
 
   return (
     <Screen
@@ -190,11 +190,22 @@ export function RecipeEditor({ id }: { id: string }) {
         />
       </div>
 
-      {steps.map((s) => (
-        <Section key={s.index} title={stepTypeLabel(s.type)}>
+      {steps.map((s, i) => (
+        <Section
+          key={s.step_index}
+          title={<span className="text-xl font-semibold text-foreground">{t('recipe.step', { n: i + 1, type: stepTypeLabel(s.type) })}</span>}
+        >
+          <div className="mb-3">
+            <TextField
+              label={t('recipe.method')}
+              value={s.note}
+              multiline
+              onSave={(note) => saveSteps(steps.map((x) => (x.step_index === s.step_index ? { ...x, note } : x)))}
+            />
+          </div>
           <RowList>
             {r.lines
-              .filter((l) => l.step_index === s.index)
+              .filter((l) => l.step_index === s.step_index)
               .sort((a, b) => a.position - b.position)
               .map((l) => (
                 <LineCard
@@ -205,15 +216,21 @@ export function RecipeEditor({ id }: { id: string }) {
                   onRemove={() => saveLines(r.lines.filter((x) => x.id !== l.id))}
                 />
               ))}
-            <AddLine onAdd={(name) => void addLine(s.index, s.type, name)} />
+            <AddLine onAdd={(name) => void addLine(s.step_index, s.type, name)} />
           </RowList>
+          {r.steps.length > 0 && (
+            <Button variant="ghost" className="mt-2 text-muted-foreground" onClick={() => void removeStep(s.step_index)}>
+              <Trash2 />
+              {t('recipe.removeStep')}
+            </Button>
+          )}
         </Section>
       ))}
 
       <Section title={t('recipe.addStep')}>
         <Chips>
           {STEP_TYPES.filter((type) => type !== 'ferment' || steps.length === 0).map((type) => (
-            <Chip key={type} onClick={() => setNewSteps((list) => [...list, { index: nextIndex, type }])}>
+            <Chip key={type} onClick={() => void saveSteps([...steps, { step_index: nextIndex, type, note: null }])}>
               {stepTypeLabel(type)}
             </Chip>
           ))}

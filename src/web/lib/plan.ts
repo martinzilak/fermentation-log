@@ -22,7 +22,7 @@ export function calcSteps(steps: StepView[], without?: string): CalcStep[] {
 
 /** The recipe lines a batch step follows. */
 export function recipeLinesFor(recipe: RecipeView, batch: BatchView, stepId: string): RecipeLineView[] {
-  const index = recipeStepFor(recipe.lines, batch.steps, stepId);
+  const index = recipeStepFor(recipe.steps, batch.steps, stepId);
   return index === null ? [] : recipe.lines.filter((l) => l.step_index === index);
 }
 

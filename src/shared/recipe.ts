@@ -176,6 +176,12 @@ export interface BatchLineForRecipe {
   catalog_id: string | null;
 }
 
+export interface RecipeStep {
+  step_index: number;
+  type: StepType;
+  note: string | null;
+}
+
 export type DraftRecipeLine = Omit<RecipeLine, 'id' | 'shu_min' | 'shu_max' | 'mode'> & {
   mode: 'grams' | 'percent';
   variety_id: string | null;
@@ -189,8 +195,12 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * become percent of peppers and salt percent of ferment_total. After the
  * ferment, thickeners become percent of the sauce and other additions percent
  * of the mash; the mash itself is weighed, not added, so it is left out.
+ * Every step is kept, with or without additions.
  */
-export function recipeFromBatch(steps: { type: StepType; position: number; lines: BatchLineForRecipe[] }[]): DraftRecipeLine[] {
+export function recipeFromBatch(steps: { type: StepType; position: number; lines: BatchLineForRecipe[] }[]): {
+  steps: RecipeStep[];
+  lines: DraftRecipeLine[];
+} {
   const ordered = [...steps].sort((a, b) => a.position - b.position);
   const calc: CalcStep[] = ordered.map((s) => ({
     type: s.type,
@@ -201,10 +211,8 @@ export function recipeFromBatch(steps: { type: StepType; position: number; lines
   const b = bases(calc);
   const ferment = ordered.find((s) => s.type === 'ferment');
   const out: DraftRecipeLine[] = [];
-  let index = 0;
-  for (const step of ordered) {
+  ordered.forEach((step, index) => {
     const lines = step.lines.filter((l) => l.grams !== null && l.kind !== 'mash');
-    if (lines.length === 0) continue;
     const afterFerment = step !== ferment;
     lines.forEach((l, position) => {
       const g = l.grams!;
@@ -232,9 +240,8 @@ export function recipeFromBatch(steps: { type: StepType; position: number; lines
         catalog_id: l.catalog_id,
       });
     });
-    index++;
-  }
-  return out;
+  });
+  return { steps: ordered.map((s, step_index) => ({ step_index, type: s.type, note: null })), lines: out };
 }
 
 /**
@@ -242,13 +249,27 @@ export function recipeFromBatch(steps: { type: StepType; position: number; lines
  * follows the n-th step of that type in the recipe.
  */
 export function recipeStepFor(
-  recipe: Pick<RecipeLine, 'step_index' | 'step_type'>[],
+  recipe: Pick<RecipeStep, 'step_index' | 'type'>[],
   batchSteps: { id: string; type: StepType; position: number }[],
   stepId: string,
 ): number | null {
   const step = batchSteps.find((s) => s.id === stepId);
   if (!step) return null;
   const n = batchSteps.filter((s) => s.type === step.type && s.position < step.position).length;
-  const indexes = [...new Set(recipe.filter((l) => l.step_type === step.type).map((l) => l.step_index))].sort((a, b) => a - b);
+  const indexes = recipe.filter((s) => s.type === step.type).map((s) => s.step_index).sort((a, b) => a - b);
   return indexes[n] ?? null;
+}
+
+/** The first recipe step the batch has no step for yet, by the same matching. */
+export function nextRecipeStep<S extends Pick<RecipeStep, 'step_index' | 'type'>>(
+  recipe: S[],
+  batchSteps: { type: StepType }[],
+): S | null {
+  const seen = new Map<StepType, number>();
+  for (const s of [...recipe].sort((a, b) => a.step_index - b.step_index)) {
+    const n = seen.get(s.type) ?? 0;
+    seen.set(s.type, n + 1);
+    if (batchSteps.filter((b) => b.type === s.type).length <= n) return s;
+  }
+  return null;
 }

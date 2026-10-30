@@ -41,7 +41,7 @@ describe('recipes (SPEC §7.3)', () => {
     ]);
     expect(res.body.lines[1].catalog_id).toBeTruthy();
     expect((await t.call('POST', '/api/recipes', { id: recipeId, name: 'Again' })).status).toBe(200);
-    expect((await t.call('GET', '/api/recipes')).body.map((r: { name: string }) => r.name)).toEqual(['House red']);
+    expect((await t.call('GET', '/api/recipes')).body.filter((r: { id: string }) => r.id === recipeId).map((r: { name: string }) => r.name)).toEqual(['House red']);
   });
 
   it('replaces the lines on PATCH and keeps them otherwise', async () => {
@@ -52,6 +52,39 @@ describe('recipes (SPEC §7.3)', () => {
       lines: [line('Salt', 'salt', { mode: 'percent', percent: 3, base: 'ferment_total' })],
     });
     expect(res.body).toMatchObject({ name: 'B', lines: [{ name: 'Salt', percent: 3, base: 'ferment_total' }] });
+  });
+
+  it('keeps steps without lines and gives each line its step', async () => {
+    const recipeId = id();
+    const res = await t.call('POST', '/api/recipes', {
+      id: recipeId,
+      name: 'Stepped',
+      steps: [
+        { step_index: 0, type: 'ferment', note: 'Three weeks' },
+        { step_index: 1, type: 'cook' },
+        { step_index: 2, type: 'strain' },
+      ],
+      lines: [line('Jalapeño', 'pepper', { mode: 'grams', grams: 100 }), line('Vinegar', 'acid', { mode: 'grams', grams: 10 }, { step_index: 3, step_type: 'blend' })],
+    });
+    expect(res.body.steps).toEqual([
+      { step_index: 0, type: 'ferment', note: 'Three weeks' },
+      { step_index: 1, type: 'cook', note: null },
+      { step_index: 2, type: 'strain', note: null },
+      { step_index: 3, type: 'blend', note: null },
+    ]);
+    // A step changing type takes its lines along; lines alone keep the steps.
+    const patched = await t.call('PATCH', `/api/recipes/${recipeId}`, {
+      steps: [
+        { step_index: 0, type: 'ferment' },
+        { step_index: 3, type: 'cook', note: 'Simmer' },
+      ],
+    });
+    expect(patched.body.steps.map((s: { type: string }) => s.type)).toEqual(['ferment', 'cook']);
+    expect(patched.body.lines.map((l: { step_type: string }) => l.step_type)).toEqual(['ferment', 'cook']);
+    const named = await t.call('PATCH', `/api/recipes/${recipeId}`, { name: 'Renamed' });
+    expect(named.body.steps).toHaveLength(2);
+    const bad = await t.call('PATCH', `/api/recipes/${recipeId}`, { steps: [{ step_index: 0, type: 'ferment' }, { step_index: 0, type: 'cook' }] });
+    expect(bad.status).toBe(400);
   });
 
   it('rejects a percent line without a base, a second solve line and remainder lines', async () => {
@@ -97,6 +130,7 @@ describe('recipes (SPEC §7.3)', () => {
     await t.call('POST', `/api/batches/${batchId}/steps`, { id: blend, type: 'blend', date: '2026-10-20' });
     await t.call('POST', `/api/steps/${blend}/lines`, { id: id(), name: 'Mash', kind: 'mash', grams: 420 });
     await t.call('POST', `/api/steps/${blend}/lines`, { id: id(), name: 'Vinegar', kind: 'acid', grams: 42 });
+    await t.call('POST', `/api/batches/${batchId}/steps`, { id: id(), type: 'strain', date: '2026-10-21' });
 
     const recipeId = id();
     const res = await t.call('POST', `/api/batches/${batchId}/save-as-recipe`, { id: recipeId });
@@ -108,8 +142,9 @@ describe('recipes (SPEC §7.3)', () => {
       ['ferment', 'Salt', 'percent', 3, 'ferment_total'],
       ['blend', 'Vinegar', 'percent', 10, 'mash'],
     ]);
+    expect(res.body.steps.map((s: { type: string }) => s.type)).toEqual(['ferment', 'blend', 'strain']);
     // Replaying the request, as the outbox may, creates nothing new.
     expect((await t.call('POST', `/api/batches/${batchId}/save-as-recipe`, { id: recipeId })).status).toBe(200);
-    expect(t.db.prepare('SELECT COUNT(*) FROM recipes').pluck().get()).toBe(1);
+    expect(t.db.prepare('SELECT COUNT(*) FROM recipes WHERE created_from_batch_id = ?').pluck().get(batchId)).toBe(1);
   });
 });

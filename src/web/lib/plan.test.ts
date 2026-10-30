@@ -32,6 +32,10 @@ const recipe: RecipeView = {
   created_at: '',
   updated_at: '',
   author: '',
+  steps: [
+    { step_index: 0, type: 'ferment', note: null },
+    { step_index: 1, type: 'blend', note: null },
+  ],
   lines: [
     rline('jal', 'Jalapeño', 'pepper', { grams: 900, shu_min: 0, shu_max: 0 }),
     rline('hab', 'Habanero', 'pepper', { solve_for_heat: true, shu_min: 200_000, shu_max: 200_000 }),

@@ -1,6 +1,6 @@
 // Shapes of API responses (SPEC §11), as the server's batch view returns them.
 import type { Derived } from '../../shared/calc.ts';
-import type { RecipeLine } from '../../shared/recipe.ts';
+import type { RecipeLine, RecipeStep } from '../../shared/recipe.ts';
 import type { BatchStatus, EventType, Kind, StepType } from '../../shared/schemas.ts';
 
 export interface BatchSummary {
@@ -158,5 +158,6 @@ export interface RecipeView {
   created_at: string;
   updated_at: string;
   author: string;
+  steps: RecipeStep[];
   lines: RecipeLineView[];
 }

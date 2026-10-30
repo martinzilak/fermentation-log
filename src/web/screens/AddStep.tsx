@@ -1,8 +1,10 @@
 // Add a step (SPEC §8.2 item 3): pick the type, and weighing mode opens for
 // its additions. The step is saved on the tap, dated today unless changed.
-// In a batch from a recipe, the step gets the lines of the matching recipe
-// step to weigh, and a mash line first when their plan depends on it.
+// In a batch from a recipe, the recipe's next step is offered first, with its
+// method; the step gets the lines of the matching recipe step to weigh, and a
+// mash line first when their plan depends on it.
 import { useState } from 'react';
+import { nextRecipeStep } from '../../shared/recipe.ts';
 import { STEP_TYPES, type StepType } from '../../shared/schemas.ts';
 import { DatePick } from '@/components/DatePick';
 import { Screen } from '@/components/Screen';
@@ -25,6 +27,8 @@ export function AddStep({ batchId }: { batchId: string }) {
   const detail = `/b/${batchId}`;
   const batch = useQuery<BatchView>(`/api/batches/${batchId}`).data;
   const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch?.recipe_id);
+  const next = recipe && batch ? nextRecipeStep(recipe.steps, batch.steps) : null;
+  const offer = next && next.type !== 'ferment' ? next : null;
 
   async function add(type: StepType) {
     const id = crypto.randomUUID();
@@ -59,6 +63,14 @@ export function AddStep({ batchId }: { batchId: string }) {
     >
       <h2 className="mb-2 text-lg text-muted-foreground">{t('step.date')}</h2>
       <DatePick value={date} onChange={setDate} />
+      {offer && (
+        <div className="mt-6">
+          <Button size="lg" className="w-full" onClick={() => void add(offer.type)}>
+            {t('step.next', { type: stepTypeLabel(offer.type) })}
+          </Button>
+          {offer.note && <p className="mt-2 whitespace-pre-line text-lg text-muted-foreground">{offer.note}</p>}
+        </div>
+      )}
       <div className="mt-6 grid grid-cols-2 gap-3">
         {TYPES.map((type) => (
           <Button key={type} size="lg" variant="secondary" onClick={() => void add(type)}>

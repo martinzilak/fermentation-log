@@ -233,6 +233,17 @@ export const RecipeLine = v.pipe(
   v.check((l) => !l.solve_for_heat || l.mode === 'grams', 'Only a grams line can be solved for heat'),
 );
 
+export const RecipeStep = v.object({
+  step_index: Position,
+  type: v.picklist(STEP_TYPES),
+  note: v.optional(v.nullable(Text)),
+});
+
+const RecipeSteps = v.pipe(
+  v.array(RecipeStep),
+  v.check((steps) => new Set(steps.map((s) => s.step_index)).size === steps.length, 'Two steps share an index'),
+);
+
 const RecipeLines = v.pipe(
   v.array(RecipeLine),
   v.check((lines) => lines.filter((l) => l.solve_for_heat).length <= 1, 'At most one line can be solved for heat'),
@@ -240,7 +251,7 @@ const RecipeLines = v.pipe(
 
 export const Recipe = resource(
   { name: Name },
-  { notes_md: Text, heat_target_shu: v.nullable(Shu), lines: RecipeLines },
+  { notes_md: Text, heat_target_shu: v.nullable(Shu), steps: RecipeSteps, lines: RecipeLines },
 );
 
 export const RecipeEvaluate = v.object({

@@ -53,6 +53,9 @@ const en = {
   'recipe.heatGoal': 'Heat goal (SHU)',
   'recipe.heatGoalNone': 'None',
   'recipe.addStep': 'Add a step',
+  'recipe.step': '{n}. {type}',
+  'recipe.method': 'Method',
+  'recipe.removeStep': 'Remove this step',
   'recipe.notes': 'Notes',
   'recipe.ingredient': 'Ingredient',
   'recipe.kind': 'Kind',
@@ -328,6 +331,7 @@ const en = {
   'step.title': 'Add a step',
   'step.mash': 'Mash',
   'step.date': 'Date',
+  'step.next': 'Next in the recipe: {type}',
   'step.added': '{type} step added',
 
   'note.title': 'Note',
