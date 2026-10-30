@@ -51,6 +51,7 @@ export function BatchDetail({ id }: { id: string }) {
 
   const d = batch.derived;
   const fermenting = batch.status === 'fermenting';
+  const bottled = batch.status === 'bottled' || batch.status === 'archived';
   const level = d.heat ? heatLevel(d.heat.low, d.heat.high) : null;
   const hasMash = batch.steps.some((s) => s.lines.some((l) => l.kind === 'mash' && l.grams));
   // A jar that doesn't burp itself gets Burped next to the photo while it ferments.
@@ -127,7 +128,12 @@ export function BatchDetail({ id }: { id: string }) {
             <Button variant="outline" onClick={() => goBack('/')}>
               {t('detail.batches')}
             </Button>
-            <Button onClick={() => navigate(`/b/${id}/add-step`)}>{t('detail.addStep')}</Button>
+            {/* Once bottled, what's left to do is taste it. */}
+            {bottled ? (
+              <Button onClick={() => navigate(`/b/${id}/tasting`)}>{t('event.tastingAction')}</Button>
+            ) : (
+              <Button onClick={() => navigate(`/b/${id}/add-step`)}>{t('detail.addStep')}</Button>
+            )}
           </ActionRow>
         </>
       }
