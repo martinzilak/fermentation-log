@@ -4,7 +4,7 @@
 // Voice notes were dropped (SPEC §15.5); any recorded earlier still play here.
 import { Ellipsis, FlaskConical, NotebookPen, Wind } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { ColorDot, PhLabel, StatusBadge } from '@/components/Labels';
+import { HeatPips, PhLabel, Plate, StatusBadge } from '@/components/Labels';
 import { ActionRow, Screen } from '@/components/Screen';
 import { PhotoButton } from '@/components/PhotoButton';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { dayNumber, formatDay, formatStamp, stars } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatMl, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
+import { heatLevel } from '@/lib/heat';
 import { saltWarning } from '@/lib/salt';
 import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
@@ -20,6 +21,10 @@ import type { Attachment, BatchView, BottleType, EventView, Fill, RecipeView, Se
 import { cn } from '@/lib/utils';
 import { useLogEvent } from '@/screens/BatchMore';
 
+
+const sectionTitle = 'mt-8 mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase';
+// The batch's tools: icon over a short label, one row.
+const tool = 'h-14 flex-col gap-0 px-1 text-base';
 
 export function BatchDetail({ id }: { id: string }) {
   const url = `/api/batches/${id}`;
@@ -46,6 +51,7 @@ export function BatchDetail({ id }: { id: string }) {
 
   const d = batch.derived;
   const fermenting = batch.status === 'fermenting';
+  const level = d.heat ? heatLevel(d.heat.low, d.heat.high) : null;
   const hasMash = batch.steps.some((s) => s.lines.some((l) => l.kind === 'mash' && l.grams));
   // A jar that doesn't burp itself gets Burped next to the photo while it ferments.
   const needsBurping = fermenting && batch.steps.some((s) => s.type === 'ferment' && s.params.needs_burping === true);
@@ -55,7 +61,7 @@ export function BatchDetail({ id }: { id: string }) {
 
   const stepsSection = (
     <section key="steps">
-      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.steps')}</h2>
+      <h2 className={sectionTitle}>{t('detail.steps')}</h2>
       {batch.steps.length === 0 && <p className="text-muted-foreground">{t('detail.noSteps')}</p>}
       <div className="flex flex-col gap-4">
         {batch.steps.map((s) => (
@@ -73,11 +79,11 @@ export function BatchDetail({ id }: { id: string }) {
   );
   const timelineSection = (
     <section key="timeline">
-      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.timeline')}</h2>
+      <h2 className={sectionTitle}>{t('detail.timeline')}</h2>
       {batch.events.length === 0 && <p className="text-muted-foreground">{t('detail.noEvents')}</p>}
-      <ol className="flex flex-col gap-3">
+      <ol className="divide-y rounded-xl border bg-card">
         {batch.events.map((e) => (
-          <li key={e.id} className="rounded-xl border bg-card px-4 py-3">
+          <li key={e.id} className="px-4 py-3">
             <EventItem event={e} bottleTypes={bottleTypes} onOpen={setViewing} />
           </li>
         ))}
@@ -89,31 +95,30 @@ export function BatchDetail({ id }: { id: string }) {
     <Screen
       title={
         <span className="flex items-center gap-3">
-          <span className="text-4xl tabular-nums">#{batch.number}</span>
-          <ColorDot color={batch.color} />
-          {batch.name && <span className="truncate">{batch.name}</span>}
+          <Plate number={batch.number} color={batch.color} large />
+          {batch.name && <span className="min-w-0 break-words">{batch.name}</span>}
         </span>
       }
       subtitle={<StatusBadge status={batch.status} />}
       footer={
         <>
           <ActionRow>
-            <PhotoButton batchId={id} className="flex-col gap-0 text-base" />
+            <PhotoButton batchId={id} size="default" className={tool} />
             {needsBurping && (
-              <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => void log('burp', {}, t('event.burped'))}>
+              <Button variant="secondary" className={tool} onClick={() => void log('burp', {}, t('event.burped'))}>
                 <Wind />
                 {t('event.burpAction')}
               </Button>
             )}
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
+            <Button variant="secondary" className={tool} onClick={() => navigate(`/b/${id}/ph`)}>
               <FlaskConical />
               {t('detail.ph')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/note`)}>
+            <Button variant="secondary" className={tool} onClick={() => navigate(`/b/${id}/note`)}>
               <NotebookPen />
               {t('detail.note')}
             </Button>
-            <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/more`)}>
+            <Button variant="secondary" className={tool} onClick={() => navigate(`/b/${id}/more`)}>
               <Ellipsis />
               {t('more.title')}
             </Button>
@@ -127,7 +132,8 @@ export function BatchDetail({ id }: { id: string }) {
         </>
       }
     >
-      <section className="grid grid-cols-2 gap-3">
+      {/* Two to a row; an odd one out takes the whole last row. */}
+      <section className="grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2">
         <Stat label={t('detail.salt')} note={saltNote ?? undefined} warn={saltNote !== null}>
           {d.salt_pct === null ? '—' : formatPct(d.salt_pct)}
         </Stat>
@@ -136,13 +142,14 @@ export function BatchDetail({ id }: { id: string }) {
         ) : (
           d.ferment_days !== null && <Stat label={t('detail.fermentDays')}>{t('detail.days', { n: d.ferment_days })}</Stat>
         )}
-        {d.heat && d.heat.high > 0 && (
+        {d.heat && level && (
           <Stat
             label={t('detail.heat')}
-            wide
-            note={d.heat.unknown.length > 0 ? t('detail.heatUnknown', { names: d.heat.unknown.join(', ') }) : undefined}
+            note={[formatShuRange(d.heat.low, d.heat.high), d.heat.unknown.length > 0 ? t('detail.heatUnknown', { names: d.heat.unknown.join(', ') }) : null]
+              .filter(Boolean)
+              .join('. ')}
           >
-            {formatShuRange(d.heat.low, d.heat.high)}
+            <HeatPips {...level} />
           </Stat>
         )}
         {d.sauce_additions_g > 0 && (
@@ -176,8 +183,8 @@ interface StatProps {
 function Stat({ label, children, note, wide = false, warn = false }: StatProps) {
   return (
     <div className={cn('rounded-xl border bg-card p-3', wide && 'col-span-2', warn && 'border-destructive')}>
-      <p className="text-base text-muted-foreground">{label}</p>
-      <p className={cn('text-3xl font-bold tabular-nums', warn && 'text-destructive')}>{children}</p>
+      <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">{label}</p>
+      <div className={cn('font-display text-4xl leading-tight font-bold tabular-nums', warn && 'text-destructive')}>{children}</div>
       {note && <p className={cn('mt-1 text-base', warn ? 'text-destructive' : 'text-muted-foreground')}>{note}</p>}
     </div>
   );
@@ -199,8 +206,8 @@ function StepCard({ step, vessels, method, onAdd, onLine }: StepCardProps) {
   return (
     <section className="rounded-xl border bg-card">
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 px-4 pt-3">
-        <h3 className="text-xl font-semibold">{stepTypeLabel(step.type)}</h3>
-        {step.date && <span className="text-lg text-muted-foreground">{formatDay(step.date)}</span>}
+        <h3 className="font-display text-2xl font-extrabold tracking-wide uppercase">{stepTypeLabel(step.type)}</h3>
+        {step.date && <span className="font-mono text-sm text-muted-foreground">{formatDay(step.date)}</span>}
       </header>
       {(vessel || tare != null) && (
         <p className="px-4 text-lg text-muted-foreground">
@@ -219,10 +226,10 @@ function StepCard({ step, vessels, method, onAdd, onLine }: StepCardProps) {
                 className="flex w-full justify-between gap-4 px-4 py-2 text-left text-lg active:bg-accent"
               >
                 <span>{l.name}</span>
-                <span className="shrink-0 text-right tabular-nums">
+                <span className="shrink-0 text-right font-mono text-base tabular-nums">
                   {l.grams === null ? (l.planned_g === null ? '—' : '') : formatGrams(l.grams)}
                   {l.planned_g !== null && (
-                    <span className="block text-base text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
+                    <span className="block text-sm text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
                   )}
                 </span>
               </button>
@@ -247,7 +254,7 @@ function EventItem({ event: e, bottleTypes, onOpen }: { event: EventView; bottle
     <>
       <p className="flex justify-between gap-4 text-base text-muted-foreground">
         <span className="font-semibold text-foreground">{eventLabel(e.type)}</span>
-        <span>{formatStamp(e.occurred_at)}</span>
+        <span className="font-mono text-sm">{formatStamp(e.occurred_at)}</span>
       </p>
       {e.type === 'ph' && typeof p.value === 'number' && (
         <div className="mt-1">

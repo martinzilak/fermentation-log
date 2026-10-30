@@ -1,5 +1,6 @@
-// Batch list (SPEC §8.2 item 1): newest first, one card per batch.
-import { ColorDot, StatusBadge } from '@/components/Labels';
+// Batch list (SPEC §8.2 item 1): newest first, one card per batch, its number
+// as a plate in the cap colour (SPEC §15.12).
+import { Plate, StatusBadge } from '@/components/Labels';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/ui/button';
 import { dayNumber } from '@/lib/format';
@@ -17,7 +18,7 @@ export function BatchList() {
       title={t('list.title')}
       footer={
         <div className="flex gap-3">
-          <Button variant="outline" className="h-16 px-6" onClick={() => navigate('/more')}>
+          <Button variant="outline" className="h-16 px-5" onClick={() => navigate('/more')}>
             {t('list.more')}
           </Button>
           <Button size="lg" className="flex-1" onClick={() => navigate('/new')}>
@@ -34,17 +35,19 @@ export function BatchList() {
             <button
               type="button"
               onClick={(e) => acceptPress(e) && navigate(`/b/${b.id}`)}
-              className="flex min-h-20 w-full items-center gap-4 rounded-xl border bg-card px-4 py-3 text-left active:bg-accent"
+              className="flex min-h-20 w-full items-center gap-3 rounded-xl border bg-card px-3 py-3 text-left active:bg-accent"
             >
-              <span className="text-3xl font-bold tabular-nums">#{b.number}</span>
-              <ColorDot color={b.color} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                {b.name && <span className="truncate text-lg font-medium">{b.name}</span>}
-                {b.ferment_day !== null && (
-                  <span className="text-lg text-muted-foreground">{t('list.day', { n: dayNumber(b.ferment_day) })}</span>
-                )}
+              <Plate number={b.number} color={b.color} />
+              {/* The name gets its own line, so it's never cut short. */}
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                {b.name && <span className="font-display text-2xl leading-none font-bold break-words uppercase">{b.name}</span>}
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <StatusBadge status={b.status} />
+                  {b.ferment_day !== null && (
+                    <span className="font-mono text-sm text-muted-foreground">{t('list.day', { n: dayNumber(b.ferment_day) })}</span>
+                  )}
+                </span>
               </span>
-              <StatusBadge status={b.status} />
             </button>
           </li>
         ))}

@@ -21,7 +21,19 @@ export const dayNumber = (fermentDay: number) => fermentDay + 1;
 /** A tasting rating out of five: "★★★★☆". */
 export const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
+// The six cap colours, tuned to sit with the theme and to show on both
+// backgrounds (pure CSS yellow vanished on light).
+const CAPS: Record<string, string> = {
+  red: '#e5484d',
+  orange: '#f5a524',
+  yellow: '#f0c808',
+  green: '#3fa34d',
+  brown: '#8d5a3b',
+  purple: '#8e4ec6',
+};
+
 /** A batch colour usable in CSS, or null for free text the browser doesn't know. */
-export function cssColor(color: string | null): string | null {
-  return color && CSS.supports('color', color) ? color : null;
+export function capColor(color: string | null): string | null {
+  if (!color) return null;
+  return CAPS[color] ?? (CSS.supports('color', color) ? color : null);
 }
