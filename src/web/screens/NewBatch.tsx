@@ -3,7 +3,9 @@
 // saved on Start, so leaving the weighing flow later loses nothing. From a
 // recipe, the ferment step also gets the recipe's lines, still to weigh; their
 // plans follow what is actually weighed (SPEC §7.3). The colour (of the caps or
-// labels) is chosen at bottling (SPEC §15.5).
+// labels) is chosen at bottling (SPEC §15.5). Whether the container needs
+// burping (SPEC §15.11) starts as last time's answer on this phone. The short
+// choices come first; the recipes are a list, the picked one opening in place.
 import { Minus, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Chip, Chips } from '@/components/Chip';
@@ -16,6 +18,7 @@ import { todayIso } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { recipeLineText } from '@/lib/recipes';
 import { invalidate, useQuery } from '@/lib/query';
+import { readLocal, writeLocal } from '@/lib/storage';
 import { goBack, navigate } from '@/lib/router';
 import type { BatchSummary, RecipeLineView, RecipeView } from '@/lib/types';
 import { useWakeLock } from '@/lib/wakelock';
@@ -29,6 +32,7 @@ export function NewBatch() {
   const [date, setDate] = useState(todayIso());
   const recipes = useQuery<RecipeView[]>('/api/recipes').data ?? [];
   const [recipeId, setRecipeId] = useState<string | null>(null);
+  const [needsBurping, setNeedsBurping] = useState(() => readLocal('needsBurping') === '1');
   const recipe = recipes.find((r) => r.id === recipeId);
   const fermentLines = recipe ? firstFermentLines(recipe) : [];
   const shown = number ?? next;
@@ -41,7 +45,7 @@ export function NewBatch() {
     const created = await toast.run(async () => {
       // A batch from a recipe is named after it, which the edit screen can change.
       await api.post('/api/batches', { id: batchId, number: shown, name: recipe?.name ?? null, recipe_id: recipe?.id ?? null });
-      await api.post(`/api/batches/${batchId}/steps`, { id: stepId, type: 'ferment', date, params: {} });
+      await api.post(`/api/batches/${batchId}/steps`, { id: stepId, type: 'ferment', date, params: { needs_burping: needsBurping } });
       for (const l of fermentLines) {
         await api.post(`/api/steps/${stepId}/lines`, {
           id: lineId(l.id),
@@ -56,6 +60,7 @@ export function NewBatch() {
     });
     invalidate('/api/batches');
     if (!created) return;
+    writeLocal('needsBurping', needsBurping ? '1' : null);
     navigate(`/b/${batchId}/s/${stepId}`, { replace: true });
     toast.show(t('new.started', { n: shown }), async () => {
       await api.del(`/api/batches/${batchId}`);
@@ -79,31 +84,6 @@ export function NewBatch() {
       }
     >
       <section className="flex flex-col gap-6">
-        {recipes.length > 0 && (
-          <div>
-            <h2 className="mb-2 text-lg text-muted-foreground">{t('new.recipe')}</h2>
-            <Chips>
-              <Chip selected={!recipe} onClick={() => setRecipeId(null)}>
-                {t('new.blank')}
-              </Chip>
-              {recipes.map((r) => (
-                <Chip key={r.id} selected={r.id === recipeId} onClick={() => setRecipeId(r.id)}>
-                  {r.name}
-                </Chip>
-              ))}
-            </Chips>
-            {recipe && (
-              <ul className="mt-3 divide-y rounded-xl border">
-                {fermentLines.map((l) => (
-                  <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
-                    <span>{l.name}</span>
-                    <span className="text-right text-muted-foreground tabular-nums">{recipeLineText(l)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
         <div>
           <h2 className="mb-2 text-lg text-muted-foreground">{t('new.number')}</h2>
           <ActionRow>
@@ -120,6 +100,44 @@ export function NewBatch() {
           <h2 className="mb-2 text-lg text-muted-foreground">{t('new.date')}</h2>
           <DatePick value={date} onChange={setDate} />
         </div>
+        <div>
+          <h2 className="mb-2 text-lg text-muted-foreground">{t('new.container')}</h2>
+          <Chips>
+            <Chip selected={!needsBurping} hint={t('new.selfVentingHint')} onClick={() => setNeedsBurping(false)}>
+              {t('new.selfVenting')}
+            </Chip>
+            <Chip selected={needsBurping} hint={t('new.needsBurpingHint')} onClick={() => setNeedsBurping(true)}>
+              {t('new.needsBurping')}
+            </Chip>
+          </Chips>
+        </div>
+        {recipes.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-lg text-muted-foreground">{t('new.recipe')}</h2>
+            <div className="flex flex-col gap-3">
+              <Chip selected={!recipe} className="w-full" onClick={() => setRecipeId(null)}>
+                {t('new.blank')}
+              </Chip>
+              {recipes.map((r) => (
+                <div key={r.id}>
+                  <Chip selected={r.id === recipeId} className="w-full" onClick={() => setRecipeId(r.id)}>
+                    {r.name}
+                  </Chip>
+                  {r.id === recipeId && (
+                    <ul className="mt-2 divide-y rounded-xl border">
+                      {fermentLines.map((l) => (
+                        <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
+                          <span>{l.name}</span>
+                          <span className="text-right text-muted-foreground tabular-nums">{recipeLineText(l)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </Screen>
   );

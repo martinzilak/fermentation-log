@@ -186,6 +186,11 @@ const en = {
   'new.start': 'Start: weigh the crock',
   'new.recipe': 'Recipe',
   'new.blank': 'Blank',
+  'new.container': 'Container',
+  'new.selfVenting': 'Burps itself',
+  'new.selfVentingHint': 'Water seal or airlock',
+  'new.needsBurping': 'Needs burping',
+  'new.needsBurpingHint': 'A sealed jar',
   'new.started': 'Batch #{n} started',
   'new.discarded': 'Batch #{n} discarded',
 

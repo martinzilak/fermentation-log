@@ -1,7 +1,8 @@
 // Batch detail (SPEC §8.2 item 3): key stats, steps with their additions,
-// and the timeline, newest first. Photo, pH, Note and More sit in the bottom bar.
+// and the timeline, newest first. Photo, pH, Note and More sit in the bottom bar,
+// and Burped for a jar that needs burping (SPEC §15.11).
 // Voice notes were dropped (SPEC §15.5); any recorded earlier still play here.
-import { Ellipsis, FlaskConical, NotebookPen } from 'lucide-react';
+import { Ellipsis, FlaskConical, NotebookPen, Wind } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { ColorDot, PhLabel, StatusBadge } from '@/components/Labels';
 import { ActionRow, Screen } from '@/components/Screen';
@@ -17,6 +18,7 @@ import { goBack, navigate } from '@/lib/router';
 import { recipeStepNote } from '@/lib/plan';
 import type { Attachment, BatchView, BottleType, EventView, Fill, RecipeView, Settings, StepView, Vessel } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useLogEvent } from '@/screens/BatchMore';
 
 
 export function BatchDetail({ id }: { id: string }) {
@@ -25,6 +27,7 @@ export function BatchDetail({ id }: { id: string }) {
   const vessels = useQuery<Vessel[]>('/api/vessels').data ?? [];
   const bottleTypes = useQuery<BottleType[]>('/api/bottle-types').data ?? [];
   const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
+  const log = useLogEvent(id);
   const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch?.recipe_id);
   const [viewing, setViewing] = useState<Attachment | null>(null);
 
@@ -44,6 +47,8 @@ export function BatchDetail({ id }: { id: string }) {
   const d = batch.derived;
   const fermenting = batch.status === 'fermenting';
   const hasMash = batch.steps.some((s) => s.lines.some((l) => l.kind === 'mash' && l.grams));
+  // A jar that doesn't burp itself gets Burped next to the photo while it ferments.
+  const needsBurping = fermenting && batch.steps.some((s) => s.type === 'ferment' && s.params.needs_burping === true);
   // Only once something besides salt is in the ferment.
   const fermentIn = batch.steps.some((s) => s.type === 'ferment' && s.lines.some((l) => l.kind !== 'salt' && l.grams !== null));
   const saltNote = fermentIn ? saltWarning(d.salt_pct, targetPct) : null;
@@ -94,6 +99,12 @@ export function BatchDetail({ id }: { id: string }) {
         <>
           <ActionRow>
             <PhotoButton batchId={id} className="flex-col gap-0 text-base" />
+            {needsBurping && (
+              <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => void log('burp', {}, t('event.burped'))}>
+                <Wind />
+                {t('event.burpAction')}
+              </Button>
+            )}
             <Button size="lg" variant="secondary" className="flex-col gap-0 text-base" onClick={() => navigate(`/b/${id}/ph`)}>
               <FlaskConical />
               {t('detail.ph')}

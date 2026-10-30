@@ -250,6 +250,18 @@ export function StepEdit({ batchId, stepId }: { batchId: string; stepId: string 
           </Button>
         </Section>
       )}
+      {s.type === 'ferment' && (
+        <Section title={t('new.container')}>
+          <Chips>
+            <Chip selected={params.needs_burping !== true} hint={t('new.selfVentingHint')} onClick={() => void setParam('needs_burping', false)}>
+              {t('new.selfVenting')}
+            </Chip>
+            <Chip selected={params.needs_burping === true} hint={t('new.needsBurpingHint')} onClick={() => void setParam('needs_burping', true)}>
+              {t('new.needsBurping')}
+            </Chip>
+          </Chips>
+        </Section>
+      )}
       {s.type === 'cook' && (
         <Section>
           <div className="grid grid-cols-2 gap-3">

@@ -39,7 +39,7 @@ export interface StepView {
   type: StepType;
   position: number;
   date: string | null;
-  params: { vessel_id?: string | null; vessel_tare_g?: number | null } & Record<string, unknown>;
+  params: { vessel_id?: string | null; vessel_tare_g?: number | null; needs_burping?: boolean } & Record<string, unknown>;
   note: string | null;
   lines: LineView[];
 }

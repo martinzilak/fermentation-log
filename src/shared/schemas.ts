@@ -46,6 +46,8 @@ export const StepParams = {
     vessel_id: v.optional(v.nullable(Id)),
     // Required by the new-batch flow; optional so imported batches can omit it.
     vessel_tare_g: v.optional(v.nullable(Grams)),
+    // A sealed jar has to be burped by hand; a crock with a water seal or an airlock doesn't.
+    needs_burping: v.optional(v.boolean()),
   }),
   cook: v.object({
     temp_c: v.optional(v.nullable(v.pipe(v.number(), v.finite()))),

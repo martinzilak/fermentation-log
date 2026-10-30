@@ -1,5 +1,5 @@
 // The batch detail's More (SPEC §8.2 item 3): the less frequent events
-// (weigh, burp, issue, tasting), bottling, the edit screen, the export of
+// (weigh, issue, tasting), bottling, the edit screen, the export of
 // this one batch and saving it as a recipe (SPEC §7.3).
 import { useState } from 'react';
 import { ISSUE_KINDS } from '../../shared/schemas.ts';
@@ -19,7 +19,7 @@ import { goBack, navigate } from '@/lib/router';
 import type { BatchView } from '@/lib/types';
 
 /** Logs an event, returns to the batch and offers Undo. */
-function useLogEvent(batchId: string) {
+export function useLogEvent(batchId: string) {
   const toast = useToast();
   return async (type: string, body: { payload?: object; text?: string | null }, message: string) => {
     const id = crypto.randomUUID();
@@ -36,7 +36,6 @@ function useLogEvent(batchId: string) {
 
 export function BatchMore({ id }: { id: string }) {
   const batch = useQuery<BatchView>(`/api/batches/${id}`).data;
-  const log = useLogEvent(id);
   const toast = useToast();
   const bottled = batch?.status === 'bottled' || batch?.status === 'archived';
   const big = 'h-20 text-xl';
@@ -62,11 +61,8 @@ export function BatchMore({ id }: { id: string }) {
       }
     >
       <div className="grid grid-cols-2 gap-3">
-        <Button variant="secondary" className={big} onClick={() => navigate(`/b/${id}/weigh`, { replace: true })}>
+        <Button variant="secondary" className={`${big} col-span-2`} onClick={() => navigate(`/b/${id}/weigh`, { replace: true })}>
           {t('event.weighAction')}
-        </Button>
-        <Button variant="secondary" className={big} onClick={() => void log('burp', {}, t('event.burped'))}>
-          {t('event.burpAction')}
         </Button>
         <Button variant="secondary" className={big} onClick={() => navigate(`/b/${id}/issue`, { replace: true })}>
           {t('event.issueAction')}
