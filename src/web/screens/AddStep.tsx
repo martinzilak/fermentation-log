@@ -64,7 +64,7 @@ export function AddStep({ batchId }: { batchId: string }) {
         </Button>
       }
     >
-      <h2 className="mb-2 text-lg text-muted-foreground">{t('step.date')}</h2>
+      <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('step.date')}</h2>
       <DatePick value={date} onChange={setDate} />
       {offer && (
         <div className="mt-6">

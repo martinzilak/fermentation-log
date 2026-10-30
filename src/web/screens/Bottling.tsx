@@ -231,7 +231,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
               ))}
             </ul>
           )}
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('bottle.addFill')}</h2>
+          <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('bottle.addFill')}</h2>
           <Chips>
             {bottleTypes.map((b) => (
               <Chip key={b.id} hint={formatMl(b.volume_ml)} onClick={() => go({ name: 'count', fill: { bottle_type_id: b.id }, title: b.name })}>

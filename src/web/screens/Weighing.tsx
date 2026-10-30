@@ -307,7 +307,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           {method && <p className="mt-3 text-base whitespace-pre-line text-muted-foreground">{method}</p>}
           {toWeigh.length > 0 && (
             <section className="mt-4">
-              <h2 className="mb-2 text-lg text-muted-foreground">{t('weigh.toWeigh')}</h2>
+              <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('weigh.toWeigh')}</h2>
               <RowList>
                 {toWeigh.map((l) => (
                   <LinkRow
@@ -342,7 +342,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           </Chips>
           {added.length > 0 && (
             <section className="mt-6">
-              <h2 className="mb-2 text-lg text-muted-foreground">{t('weigh.addedHere')}</h2>
+              <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('weigh.addedHere')}</h2>
               <ul className="divide-y rounded-xl border">
                 {added.map((l) => (
                   <li key={l.id} className="flex justify-between gap-4 px-4 py-3 text-lg">

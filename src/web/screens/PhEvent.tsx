@@ -59,7 +59,7 @@ export function PhEvent({ batchId }: { batchId: string }) {
         />
       }
     >
-      <h2 className="mb-2 text-lg text-muted-foreground">{t('ph.method')}</h2>
+      <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('ph.method')}</h2>
       <Chips>
         {PH_METHODS.map((m) => (
           <Chip key={m} selected={method === m} onClick={() => pick(m)}>

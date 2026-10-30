@@ -31,7 +31,7 @@ export function PhInfo() {
       <p className="mt-4 text-lg">{t('phInfo.threshold')}</p>
       <p className="mt-3 text-lg">{t('phInfo.target')}</p>
       <p className="mt-3 text-lg">{t('phInfo.notAdvice')}</p>
-      <h2 className="mt-6 mb-2 text-lg text-muted-foreground">{t('phInfo.sources')}</h2>
+      <h2 className="mt-6 mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('phInfo.sources')}</h2>
       <ul className="flex flex-col gap-3">
         {SOURCES.map((s) => (
           <li key={s.url}>

@@ -85,7 +85,7 @@ export function NewBatch() {
     >
       <section className="flex flex-col gap-6">
         <div>
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('new.number')}</h2>
+          <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('new.number')}</h2>
           <ActionRow>
             <Button variant="outline" size="icon" aria-label={t('new.fewer')} onClick={() => setNumber(Math.max(1, shown - 1))}>
               <Minus />
@@ -97,11 +97,11 @@ export function NewBatch() {
           </ActionRow>
         </div>
         <div>
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('new.date')}</h2>
+          <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('new.date')}</h2>
           <DatePick value={date} onChange={setDate} />
         </div>
         <div>
-          <h2 className="mb-2 text-lg text-muted-foreground">{t('new.container')}</h2>
+          <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('new.container')}</h2>
           <Chips>
             <Chip selected={!needsBurping} hint={t('new.selfVentingHint')} onClick={() => setNeedsBurping(false)}>
               {t('new.selfVenting')}
@@ -113,7 +113,7 @@ export function NewBatch() {
         </div>
         {recipes.length > 0 && (
           <div>
-            <h2 className="mb-2 text-lg text-muted-foreground">{t('new.recipe')}</h2>
+            <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{t('new.recipe')}</h2>
             <div className="flex flex-col gap-3">
               <Chip selected={!recipe} className="w-full" onClick={() => setRecipeId(null)}>
                 {t('new.blank')}

@@ -39,7 +39,7 @@ export function usePatch(url: string, refreshes: string[]) {
 export function Section({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-6 first:mt-0">
-      {title && <h2 className="mb-2 text-lg text-muted-foreground">{title}</h2>}
+      {title && <h2 className="mb-2 font-mono text-sm tracking-widest text-muted-foreground uppercase">{title}</h2>}
       {children}
     </section>
   );
