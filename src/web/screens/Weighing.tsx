@@ -3,11 +3,14 @@
 // §15.2); then one ingredient per screen: pick a name, its kind and lot if
 // needed, type the grams, Next.
 // Each line is saved on Next; salt % and suggested salt update live.
+// In a batch from a recipe, the lines still to weigh come first, each with
+// its plan shown large and the deviation as you type (SPEC §7.3).
 import { useState } from 'react';
 import { bases, saltPct, suggestedSaltG, type CalcLine, type CalcStep } from '../../shared/calc.ts';
-import { cleanName } from '../../shared/names.ts';
+import { cleanName, fold } from '../../shared/names.ts';
 import { KINDS, type Kind } from '../../shared/schemas.ts';
 import { Chip, Chips } from '@/components/Chip';
+import { LinkRow, RowList } from '@/components/Edit';
 import { NumpadFooter, Readout } from '@/components/Numpad';
 import { Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
@@ -15,14 +18,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
-import { formatGrams, formatPct, parseDecimal } from '@/lib/numbers';
+import { formatGrams, formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
+import { calcSteps as batchCalcSteps, planFor, type Plan } from '@/lib/plan';
 import { invalidate, missingTitle, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
-import type { BatchView, CatalogItem, Lot, RecentLine, Settings, StepView, Variety } from '@/lib/types';
+import type { BatchView, CatalogItem, LineView, Lot, RecentLine, RecipeView, Settings, StepView, Variety } from '@/lib/types';
 import { useWakeLock } from '@/lib/wakelock';
 
-type Chosen = Pick & { kind: Kind; lot_id: string | null };
+/** `line` is a planned line being weighed, rather than a new one. */
+type Chosen = Pick & { kind: Kind; lot_id: string | null; line?: LineView | undefined };
 
 type Stage =
   | { name: 'tare' }
@@ -68,6 +73,20 @@ function lotHow(lot: { origin: Lot['origin']; propagation: Lot['propagation'] })
 const lotLabel = (lot: Lot) => `${lot.season} · ${lotHow(lot)}`;
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
+function planText(plan: Plan | null): string {
+  if (plan?.grams != null) return t('weigh.plan', { g: formatGrams(plan.grams) });
+  if (plan?.pending) return t('weigh.planAfterMash');
+  return plan?.rule ?? t('weigh.noPlan');
+}
+
+/** "+3 g · +6 %" */
+function deviation(actual: number, planned: number): string {
+  const sign = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '±');
+  const diff = round2(actual - planned);
+  const pct = planned > 0 ? ` · ${sign(diff)}${Math.abs((diff / planned) * 100).toFixed(0)} %` : '';
+  return `${sign(diff)}${formatGrams(Math.abs(diff))}${pct}`;
+}
+
 function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   useWakeLock();
   const toast = useToast();
@@ -77,8 +96,11 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   const lots = useQuery<Lot[]>('/api/lots').data ?? [];
   const recent = useQuery<RecentLine[]>('/api/lines/recent').data ?? [];
   const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
+  const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch.recipe_id);
+  const plan = (line: LineView) => planFor(line, step, batch, recipe);
 
-  const needsTare = step.type === 'ferment' && step.params.vessel_tare_g == null && step.lines.length === 0;
+  // Lines planned from a recipe are there before anything is weighed.
+  const needsTare = step.type === 'ferment' && step.params.vessel_tare_g == null && step.lines.every((l) => l.grams === null);
   const [stage, setStage] = useState<Stage>(needsTare ? { name: 'tare' } : { name: 'pick' });
   const [value, setValue] = useState('');
   const [query, setQuery] = useState('');
@@ -94,20 +116,16 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
 
   // --- Live numbers (SPEC §8.2 item 2) ---
 
-  function calcSteps(extra?: CalcLine): CalcStep[] {
-    return batch.steps.map((s) => ({
-      type: s.type,
-      position: s.position,
-      date: s.date,
-      lines: [
-        ...s.lines.map((l) => ({ name: l.name, kind: l.kind, grams: l.grams, shu_min: l.shu?.min ?? null, shu_max: l.shu?.max ?? null })),
-        ...(extra && s.id === step.id ? [extra] : []),
-      ],
+  /** The batch with the line being weighed in it, in place of its planned line if it has one. */
+  function calcSteps(extra?: CalcLine, replaces?: string): CalcStep[] {
+    return batchCalcSteps(batch.steps, replaces).map((s, i) => ({
+      ...s,
+      lines: [...s.lines, ...(extra && batch.steps[i]!.id === step.id ? [extra] : [])],
     }));
   }
 
-  function liveStats(pending?: CalcLine, compact = false) {
-    const steps = calcSteps(pending);
+  function liveStats(pending?: CalcLine, compact = false, replaces?: string) {
+    const steps = calcSteps(pending, replaces);
     if (step.type !== 'ferment') {
       return <p className="text-lg text-muted-foreground">{t('weigh.additions', { g: formatGrams(bases(steps).sauce) })}</p>;
     }
@@ -146,7 +164,23 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     });
   }
 
+  /** Weighs a planned line, snapshotting its plan as it stands now. */
+  async function savePlanned(pick: Chosen, line: LineView, grams: number) {
+    const before = { grams: line.grams, lot_id: line.lot_id, planned_g: line.planned_g };
+    const planned_g = plan(line)?.grams ?? line.planned_g;
+    const saved = await toast.run(() => api.patch(`/api/lines/${line.id}`, { grams, lot_id: pick.lot_id, planned_g }));
+    if (!saved) return;
+    void refresh(batchUrl);
+    invalidate('/api/lines/recent');
+    go({ name: 'pick' });
+    toast.show(t('weigh.added', { name: pick.name, g: formatGrams(grams) }), async () => {
+      await api.patch(`/api/lines/${line.id}`, before);
+      await refresh(batchUrl);
+    });
+  }
+
   async function saveLine(pick: Chosen, grams: number) {
+    if (pick.line) return savePlanned(pick, pick.line, grams);
     const id = crypto.randomUUID();
     const saved = await toast.run(() =>
       api.post(`/api/steps/${step.id}/lines`, {
@@ -174,9 +208,9 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
 
   // --- Choosing an ingredient ---
 
-  function choose(pick: Pick) {
+  function choose(pick: Pick, line?: LineView) {
     if (!pick.kind) return go({ name: 'kind', pick });
-    const chosen: Chosen = { ...pick, kind: pick.kind, lot_id: null };
+    const chosen: Chosen = { ...pick, kind: pick.kind, lot_id: null, line };
     // A new pepper name has no variety yet; the server creates it with the line.
     if (chosen.kind !== 'pepper' || !pick.variety_id) return go({ name: 'grams', pick: chosen });
     const own = lots.filter((l) => l.variety_id === pick.variety_id).sort((a, b) => b.season - a.season);
@@ -218,7 +252,10 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     case 'pick': {
       const { options, exact } = suggest(query, { recent, catalog, varieties }, step.type);
       const q = cleanName(query);
-      const added = [...step.lines].reverse();
+      const added = step.lines.filter((l) => l.grams !== null).reverse();
+      const toWeigh = step.lines.filter((l) => l.grams === null);
+      // A planned ingredient is weighed from its row, not added a second time.
+      const chips = options.filter((o) => !toWeigh.some((l) => l.kind === o.kind && fold(l.name) === fold(o.name)));
       return (
         <Screen
           title={t('weigh.whatNext')}
@@ -230,6 +267,21 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           }
         >
           {liveStats()}
+          {toWeigh.length > 0 && (
+            <section className="mt-4">
+              <h2 className="mb-2 text-lg text-muted-foreground">{t('weigh.toWeigh')}</h2>
+              <RowList>
+                {toWeigh.map((l) => (
+                  <LinkRow
+                    key={l.id}
+                    title={l.name}
+                    hint={l.kind === 'mash' ? t('weigh.mashFirst') : planText(plan(l))}
+                    onClick={() => choose({ name: l.name, kind: l.kind, catalog_id: l.catalog_id, variety_id: l.variety_id, note: l.note }, l)}
+                  />
+                ))}
+              </RowList>
+            </section>
+          )}
           <Input
             className="my-4"
             placeholder={t('weigh.search')}
@@ -243,7 +295,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
                 {t('weigh.useName', { name: q })}
               </Chip>
             )}
-            {options.map((o) => (
+            {chips.map((o) => (
               <Chip key={`${o.name}|${o.kind}`} hint={kindHint(o)} onClick={() => choose(o)}>
                 {o.name}
               </Chip>
@@ -256,7 +308,12 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
                 {added.map((l) => (
                   <li key={l.id} className="flex justify-between gap-4 px-4 py-3 text-lg">
                     <span>{l.name}</span>
-                    <span className="tabular-nums">{l.grams === null ? '—' : formatGrams(l.grams)}</span>
+                    <span className="text-right tabular-nums">
+                      {formatGrams(l.grams!)}
+                      {l.planned_g !== null && (
+                        <span className="block text-base text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -322,7 +379,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           title={t('weigh.newLotTitle', { name: pick.name, season: new Date().getFullYear() })}
           subtitle={subtitle}
           footer={
-            <Button variant="outline" onClick={() => choose(pick)}>
+            <Button variant="outline" onClick={() => choose(pick, pick.line)}>
               {t('common.back')}
             </Button>
           }
@@ -343,14 +400,31 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
       const { pick } = stage;
       const net = typed === null ? null : container !== null ? typed - container : typed;
       const pending = net !== null && net >= 0 ? { name: pick.name, kind: pick.kind, grams: net, shu_min: null, shu_max: null } : undefined;
+      const planned = pick.line ? plan(pick.line) : null;
       return (
         // The name sits in the header so the keypad can never push it off screen.
         <Screen
           title={<span className="text-[48px] leading-[1.1] break-words">{pick.name}</span>}
-          subtitle={liveStats(pending, true)}
+          subtitle={liveStats(pending, true, pick.line?.id)}
           footer={numpadFooter(() => go({ name: 'pick' }), () => void nextFromGrams(pick))}
         >
-          <Readout value={value} unit="g" />
+          {pick.line ? (
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Readout value={value} unit="g" />
+                {planned?.grams != null && net !== null && (
+                  <p className="text-xl tabular-nums">{deviation(round2(net), planned.grams)}</p>
+                )}
+              </div>
+              <p className="text-right">
+                <span className="block text-lg text-muted-foreground">{t('weigh.planLabel')}</span>
+                <span className="text-5xl font-bold tabular-nums">{planned?.grams != null ? formatNumber(planned.grams) : '—'}</span>
+                {planned?.grams == null && <span className="block text-base text-muted-foreground">{planText(planned)}</span>}
+              </p>
+            </div>
+          ) : (
+            <Readout value={value} unit="g" />
+          )}
           {container !== null && net !== null && (
             <p className="text-2xl font-semibold tabular-nums">{t('weigh.net', { g: formatGrams(round2(net)) })}</p>
           )}

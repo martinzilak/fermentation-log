@@ -150,7 +150,12 @@ function StepCard({ step, vessels, onAdd }: { step: StepView; vessels: Vessel[];
           {step.lines.map((l) => (
             <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
               <span>{l.name}</span>
-              <span className="shrink-0 tabular-nums">{l.grams === null ? '—' : formatGrams(l.grams)}</span>
+              <span className="shrink-0 text-right tabular-nums">
+                {l.grams === null ? (l.planned_g === null ? '—' : '') : formatGrams(l.grams)}
+                {l.planned_g !== null && (
+                  <span className="block text-base text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
+                )}
+              </span>
             </li>
           ))}
         </ul>

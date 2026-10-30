@@ -1,9 +1,12 @@
-// New batch, blank (SPEC §8.2 item 2): number and start date, then straight
-// into weighing mode. The batch and its ferment step are saved on Start, so
-// leaving the weighing flow later loses nothing. The colour (of the caps or
+// New batch (SPEC §8.2 item 2): blank or from a recipe, number and start
+// date, then straight into weighing mode. The batch and its ferment step are
+// saved on Start, so leaving the weighing flow later loses nothing. From a
+// recipe, the ferment step also gets the recipe's lines, still to weigh; their
+// plans follow what is actually weighed (SPEC §7.3). The colour (of the caps or
 // labels) is chosen at bottling (SPEC §15.5).
 import { Minus, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { Chip, Chips } from '@/components/Chip';
 import { DatePick } from '@/components/DatePick';
 import { ActionRow, Screen } from '@/components/Screen';
 import { useToast } from '@/components/Toast';
@@ -11,9 +14,10 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { todayIso } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { recipeLineText } from '@/lib/recipes';
 import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
-import type { BatchSummary } from '@/lib/types';
+import type { BatchSummary, RecipeLineView, RecipeView } from '@/lib/types';
 import { useWakeLock } from '@/lib/wakelock';
 
 export function NewBatch() {
@@ -23,15 +27,30 @@ export function NewBatch() {
   const next = (batches ?? []).reduce((max, b) => Math.max(max, b.number), 0) + 1;
   const [number, setNumber] = useState<number | null>(null);
   const [date, setDate] = useState(todayIso());
+  const recipes = useQuery<RecipeView[]>('/api/recipes').data ?? [];
+  const [recipeId, setRecipeId] = useState<string | null>(null);
+  const recipe = recipes.find((r) => r.id === recipeId);
+  const fermentLines = recipe ? firstFermentLines(recipe) : [];
   const shown = number ?? next;
   // Fixed for this screen, so a retry after a half-finished save reuses them.
-  const ids = useRef({ batch: crypto.randomUUID(), step: crypto.randomUUID() }).current;
+  const ids = useRef({ batch: crypto.randomUUID(), step: crypto.randomUUID(), lines: new Map<string, string>() }).current;
+  const lineId = (recipeLineId: string) => ids.lines.get(recipeLineId) ?? ids.lines.set(recipeLineId, crypto.randomUUID()).get(recipeLineId)!;
 
   async function start() {
     const { batch: batchId, step: stepId } = ids;
     const created = await toast.run(async () => {
-      await api.post('/api/batches', { id: batchId, number: shown });
+      await api.post('/api/batches', { id: batchId, number: shown, recipe_id: recipe?.id ?? null });
       await api.post(`/api/batches/${batchId}/steps`, { id: stepId, type: 'ferment', date, params: {} });
+      for (const l of fermentLines) {
+        await api.post(`/api/steps/${stepId}/lines`, {
+          id: lineId(l.id),
+          name: l.name,
+          kind: l.kind,
+          variety_id: l.variety_id,
+          catalog_id: l.catalog_id,
+          planned_g: l.mode === 'grams' && !l.solve_for_heat ? l.grams : null,
+        });
+      }
       return true;
     });
     invalidate('/api/batches');
@@ -59,6 +78,31 @@ export function NewBatch() {
       }
     >
       <section className="flex flex-col gap-6">
+        {recipes.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-lg text-muted-foreground">{t('new.recipe')}</h2>
+            <Chips>
+              <Chip selected={!recipe} onClick={() => setRecipeId(null)}>
+                {t('new.blank')}
+              </Chip>
+              {recipes.map((r) => (
+                <Chip key={r.id} selected={r.id === recipeId} onClick={() => setRecipeId(r.id)}>
+                  {r.name}
+                </Chip>
+              ))}
+            </Chips>
+            {recipe && (
+              <ul className="mt-3 divide-y rounded-xl border">
+                {fermentLines.map((l) => (
+                  <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
+                    <span>{l.name}</span>
+                    <span className="text-right text-muted-foreground tabular-nums">{recipeLineText(l)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div>
           <h2 className="mb-2 text-lg text-muted-foreground">{t('new.number')}</h2>
           <ActionRow>
@@ -78,4 +122,11 @@ export function NewBatch() {
       </section>
     </Screen>
   );
+}
+
+/** The lines of the recipe's first ferment step, which the new batch starts with. */
+function firstFermentLines(recipe: RecipeView): RecipeLineView[] {
+  const ferment = recipe.lines.filter((l) => l.step_type === 'ferment');
+  const index = Math.min(...ferment.map((l) => l.step_index));
+  return ferment.filter((l) => l.step_index === index);
 }

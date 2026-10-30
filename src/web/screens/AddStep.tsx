@@ -1,5 +1,7 @@
 // Add a step (SPEC §8.2 item 3): pick the type, and weighing mode opens for
 // its additions. The step is saved on the tap, dated today unless changed.
+// In a batch from a recipe, the step gets the lines of the matching recipe
+// step to weigh, and a mash line first when their plan depends on it.
 import { useState } from 'react';
 import { STEP_TYPES, type StepType } from '../../shared/schemas.ts';
 import { DatePick } from '@/components/DatePick';
@@ -9,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { todayIso } from '@/lib/format';
 import { stepTypeLabel, t } from '@/lib/i18n';
-import { invalidate } from '@/lib/query';
+import { linesForNewStep } from '@/lib/plan';
+import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
+import type { BatchView, RecipeView } from '@/lib/types';
 
 // A batch has one ferment step; it is created with the batch.
 const TYPES = STEP_TYPES.filter((type) => type !== 'ferment');
@@ -19,10 +23,21 @@ export function AddStep({ batchId }: { batchId: string }) {
   const toast = useToast();
   const [date, setDate] = useState(todayIso());
   const detail = `/b/${batchId}`;
+  const batch = useQuery<BatchView>(`/api/batches/${batchId}`).data;
+  const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch?.recipe_id);
 
   async function add(type: StepType) {
     const id = crypto.randomUUID();
-    const saved = await toast.run(() => api.post(`/api/batches/${batchId}/steps`, { id, type, date }));
+    const position = (batch?.steps ?? []).reduce((max, s) => Math.max(max, s.position + 1), 0);
+    const lines =
+      recipe && batch
+        ? linesForNewStep(recipe, { ...batch, steps: [...batch.steps, { id, type, position, date, params: {}, note: null, lines: [] }] }, id, t('step.mash'))
+        : [];
+    const saved = await toast.run(async () => {
+      await api.post(`/api/batches/${batchId}/steps`, { id, type, date });
+      for (const l of lines) await api.post(`/api/steps/${id}/lines`, { id: crypto.randomUUID(), ...l });
+      return true;
+    });
     if (!saved) return;
     invalidate('/api/batches');
     navigate(`${detail}/s/${id}`, { replace: true });
