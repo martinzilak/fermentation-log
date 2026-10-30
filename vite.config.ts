@@ -13,6 +13,8 @@ export default defineConfig({
   root: web,
   publicDir: 'public',
   resolve: { alias: { '@': web } },
+  // Shown under More, to tell which build a phone is running.
+  define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   plugins: [
     react(),
     tailwindcss(),

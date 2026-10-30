@@ -35,6 +35,7 @@ export function MoreMenu() {
           onClick={() => navigate('/settings')}
         />
       </RowList>
+      <p className="mt-6 text-base text-muted-foreground">{t('more.build', { at: formatStamp(__BUILD_TIME__) })}</p>
     </Screen>
   );
 }

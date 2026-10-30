@@ -37,6 +37,7 @@ const en = {
   'more.varietiesHint': 'Varieties, SHU and lots',
   'more.bottlesHint': 'Bottles you use regularly',
   'more.exportHint': 'Download everything, and the nightly backups',
+  'more.build': 'Version built {at}',
   'export.title': 'Export',
   'export.all': 'Download everything (.zip)',
   'export.allHint': 'Every batch as Markdown, all.json with every table, and the photos.',
