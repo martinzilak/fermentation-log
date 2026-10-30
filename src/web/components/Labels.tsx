@@ -30,7 +30,7 @@ export function Plate({ number, color, large = false }: { number: number; color:
       )}
     >
       <span aria-hidden className={large ? 'w-3' : 'w-2.5'} style={{ background: capColor(color) ?? 'var(--border)' }} />
-      <span className="flex items-center px-2">{number}</span>
+      <span className="flex min-w-[calc(2ch+1rem)] items-center justify-center px-2">{number}</span>
     </span>
   );
 }
@@ -44,11 +44,13 @@ const STATUS_STYLES: Record<BatchStatus, string> = {
   archived: 'border border-dashed border-input text-muted-foreground',
 };
 
-export function StatusBadge({ status }: { status: BatchStatus }) {
+/** Compact is the slimmer tag for the list; the batch screen gets the full block. */
+export function StatusBadge({ status, compact = false }: { status: BatchStatus; compact?: boolean }) {
   return (
     <span
       className={cn(
-        'inline-flex w-fit shrink-0 items-center rounded-sm px-2 py-0.5 font-display text-base leading-tight font-bold tracking-wider whitespace-nowrap uppercase',
+        'inline-flex w-fit shrink-0 items-center rounded-sm font-display leading-tight font-bold tracking-wider whitespace-nowrap uppercase',
+        compact ? 'px-1.5 text-sm' : 'px-2 py-0.5 text-base',
         STATUS_STYLES[status],
       )}
     >

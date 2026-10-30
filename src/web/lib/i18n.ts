@@ -30,6 +30,10 @@ const en = {
   'list.empty': 'No batches yet. Start the first one below.',
   'list.new': 'New batch',
   'list.day': 'Day {n}',
+  'list.due': 'To do today',
+  'list.due.photo': 'Photo',
+  'list.due.burp': 'Burp',
+  'list.due.ph': 'pH',
   'list.more': 'Kitchen',
 
   'more.title': 'More',
