@@ -70,7 +70,7 @@ export function invalidate(prefix: string): void {
 }
 
 /** What weighing, bottling and the batch screens read, so it's kept before it's needed offline. */
-const REFERENCE = ['/api/batches', '/api/catalog', '/api/varieties', '/api/lots', '/api/lines/recent', '/api/bottle-types', '/api/settings', '/api/vessels'];
+const REFERENCE = ['/api/batches', '/api/catalog', '/api/varieties', '/api/lots', '/api/lines/recent', '/api/bottle-types', '/api/settings', '/api/vessels', '/api/recipes'];
 
 /** Fetches the reference data in the background; screens on show refresh themselves. */
 export function prefetch(): void {

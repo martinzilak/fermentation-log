@@ -54,10 +54,12 @@ interface TextFieldProps {
   required?: boolean;
   placeholder?: string | undefined;
   inputMode?: 'text' | 'decimal' | 'numeric';
+  /** The id of a <datalist> to suggest from. */
+  list?: string | undefined;
 }
 
 /** A text field that saves when it loses focus (or on Enter), if it changed. */
-export function TextField({ label, value, onSave, multiline = false, required = false, placeholder, inputMode }: TextFieldProps) {
+export function TextField({ label, value, onSave, multiline = false, required = false, placeholder, inputMode, list }: TextFieldProps) {
   const [text, setText] = useState(value ?? '');
   const [focused, setFocused] = useState(false);
   useEffect(() => {
@@ -88,6 +90,7 @@ export function TextField({ label, value, onSave, multiline = false, required = 
         <Input
           {...common}
           inputMode={inputMode}
+          list={list}
           enterKeyHint="done"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
@@ -151,7 +154,7 @@ interface NumberFieldProps {
   max?: number;
   integer?: boolean;
   required?: boolean;
-  placeholder?: string;
+  placeholder?: string | undefined;
 }
 
 /** A number that isn't a weight (SHU, ml, °C, %): the decimal keyboard, saved on blur. */

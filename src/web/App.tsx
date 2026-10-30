@@ -18,6 +18,7 @@ import { NewBatch } from '@/screens/NewBatch';
 import { NoteEvent } from '@/screens/NoteEvent';
 import { PhEvent } from '@/screens/PhEvent';
 import { PhInfo } from '@/screens/PhInfo';
+import { RecipeEditor, RecipeList } from '@/screens/Recipes';
 import { Weighing } from '@/screens/Weighing';
 import type { ReactNode } from 'react';
 
@@ -45,6 +46,8 @@ const ROUTES: [string, (p: Record<string, string>) => ReactNode][] = [
   ['/lots/:id', (p) => <LotEditor id={p.id!} />],
   ['/bottle-types', () => <BottleTypeList />],
   ['/bottle-types/:id', (p) => <BottleTypeEditor id={p.id!} />],
+  ['/recipes', () => <RecipeList />],
+  ['/recipes/:id', (p) => <RecipeEditor key={p.id} id={p.id!} />],
   ['/export', () => <ExportScreen />],
   ['/settings', () => <SettingsScreen />],
   ['/ph-info', () => <PhInfo />],

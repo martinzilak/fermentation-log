@@ -28,6 +28,7 @@ export function MoreMenu() {
         <LinkRow title={t('catalog.title')} hint={t('more.catalogHint')} onClick={() => navigate('/catalog')} />
         <LinkRow title={t('varieties.title')} hint={t('more.varietiesHint')} onClick={() => navigate('/varieties')} />
         <LinkRow title={t('bottles.title')} hint={t('more.bottlesHint')} onClick={() => navigate('/bottle-types')} />
+        <LinkRow title={t('recipes.title')} hint={t('more.recipesHint')} onClick={() => navigate('/recipes')} />
         <LinkRow title={t('export.title')} hint={t('more.exportHint')} onClick={() => navigate('/export')} />
         <LinkRow
           title={t('settings.title')}

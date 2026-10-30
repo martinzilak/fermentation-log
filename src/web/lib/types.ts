@@ -1,5 +1,6 @@
 // Shapes of API responses (SPEC §11), as the server's batch view returns them.
 import type { Derived } from '../../shared/calc.ts';
+import type { RecipeLine } from '../../shared/recipe.ts';
 import type { BatchStatus, EventType, Kind, StepType } from '../../shared/schemas.ts';
 
 export interface BatchSummary {
@@ -140,4 +141,22 @@ export interface Settings {
 export interface ExportStatus {
   last_export_at: string | null;
   last_backup_on: string | null;
+}
+
+export interface RecipeLineView extends RecipeLine {
+  recipe_id: string;
+  variety_id: string | null;
+  catalog_id: string | null;
+}
+
+export interface RecipeView {
+  id: string;
+  name: string;
+  notes_md: string;
+  heat_target_shu: number | null;
+  created_from_batch_id: string | null;
+  created_at: string;
+  updated_at: string;
+  author: string;
+  lines: RecipeLineView[];
 }
