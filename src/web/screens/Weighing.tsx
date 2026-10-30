@@ -21,7 +21,7 @@ import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
 import { calcSteps as batchCalcSteps, planFor, recipeStepNote, type Plan } from '@/lib/plan';
 import { invalidate, missingTitle, refresh, useQuery } from '@/lib/query';
-import { goBack } from '@/lib/router';
+import { goBack, navigate } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
 import type { BatchView, CatalogItem, LineView, Lot, RecentLine, RecipeView, Settings, StepView, Variety } from '@/lib/types';
 import { saltWarning } from '@/lib/salt';
@@ -120,6 +120,24 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     setStage(next);
   };
   const leave = () => goBack(`/b/${batch.id}`);
+
+  /** Backing out before the crock is weighed: an untouched new batch goes, with Undo. */
+  async function leaveTare() {
+    const untouched = batch.steps.length === 1 && batch.events.length === 0 && step.lines.every((l) => l.grams === null);
+    if (!untouched) return leave();
+    const gone = await toast.run(async () => {
+      await api.del(batchUrl);
+      return true;
+    });
+    if (!gone) return;
+    invalidate('/api/batches');
+    navigate('/', { replace: true });
+    toast.show(t('new.discarded', { n: batch.number }), async () => {
+      await api.post(`${batchUrl}/restore`, {});
+      invalidate('/api/batches');
+      navigate(`/b/${batch.id}`);
+    });
+  }
   const subtitle = `#${batch.number} · ${stepTypeLabel(step.type)}`;
   const typed = parseDecimal(value);
 
@@ -256,7 +274,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
     case 'tare': {
       const next = () => typed !== null && void saveTare(round2(typed));
       return (
-        <Screen title={t('weigh.tareTitle')} subtitle={subtitle} footer={numpadFooter(leave, next)}>
+        <Screen title={t('weigh.tareTitle')} subtitle={subtitle} footer={numpadFooter(() => void leaveTare(), next)}>
           <Readout value={value} unit="g" />
         </Screen>
       );

@@ -187,6 +187,7 @@ const en = {
   'new.recipe': 'Recipe',
   'new.blank': 'Blank',
   'new.started': 'Batch #{n} started',
+  'new.discarded': 'Batch #{n} discarded',
 
   'detail.salt': 'Salt',
   'detail.day': 'Day',

@@ -39,7 +39,8 @@ export function NewBatch() {
   async function start() {
     const { batch: batchId, step: stepId } = ids;
     const created = await toast.run(async () => {
-      await api.post('/api/batches', { id: batchId, number: shown, recipe_id: recipe?.id ?? null });
+      // A batch from a recipe is named after it, which the edit screen can change.
+      await api.post('/api/batches', { id: batchId, number: shown, name: recipe?.name ?? null, recipe_id: recipe?.id ?? null });
       await api.post(`/api/batches/${batchId}/steps`, { id: stepId, type: 'ferment', date, params: {} });
       for (const l of fermentLines) {
         await api.post(`/api/steps/${stepId}/lines`, {

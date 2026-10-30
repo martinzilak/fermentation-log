@@ -48,6 +48,38 @@ export function BatchDetail({ id }: { id: string }) {
   const fermentIn = batch.steps.some((s) => s.type === 'ferment' && s.lines.some((l) => l.kind !== 'salt' && l.grams !== null));
   const saltNote = fermentIn ? saltWarning(d.salt_pct, targetPct) : null;
 
+  const stepsSection = (
+    <section key="steps">
+      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.steps')}</h2>
+      {batch.steps.length === 0 && <p className="text-muted-foreground">{t('detail.noSteps')}</p>}
+      <div className="flex flex-col gap-4">
+        {batch.steps.map((s) => (
+          <StepCard
+            key={s.id}
+            step={s}
+            vessels={vessels}
+            method={recipeStepNote(recipe, batch, s.id)}
+            onAdd={() => navigate(`/b/${id}/s/${s.id}`)}
+            onLine={(lineId) => navigate(`/b/${id}/l/${lineId}`)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+  const timelineSection = (
+    <section key="timeline">
+      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.timeline')}</h2>
+      {batch.events.length === 0 && <p className="text-muted-foreground">{t('detail.noEvents')}</p>}
+      <ol className="flex flex-col gap-3">
+        {batch.events.map((e) => (
+          <li key={e.id} className="rounded-xl border bg-card px-4 py-3">
+            <EventItem event={e} bottleTypes={bottleTypes} onOpen={setViewing} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+
   return (
     <Screen
       title={
@@ -114,30 +146,8 @@ export function BatchDetail({ id }: { id: string }) {
         )}
       </section>
 
-      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.steps')}</h2>
-      {batch.steps.length === 0 && <p className="text-muted-foreground">{t('detail.noSteps')}</p>}
-      <div className="flex flex-col gap-4">
-        {batch.steps.map((s) => (
-          <StepCard
-            key={s.id}
-            step={s}
-            vessels={vessels}
-            method={recipeStepNote(recipe, batch, s.id)}
-            onAdd={() => navigate(`/b/${id}/s/${s.id}`)}
-            onLine={(lineId) => navigate(`/b/${id}/l/${lineId}`)}
-          />
-        ))}
-      </div>
-
-      <h2 className="mt-8 mb-3 text-xl font-bold">{t('detail.timeline')}</h2>
-      {batch.events.length === 0 && <p className="text-muted-foreground">{t('detail.noEvents')}</p>}
-      <ol className="flex flex-col gap-3">
-        {batch.events.map((e) => (
-          <li key={e.id} className="rounded-xl border bg-card px-4 py-3">
-            <EventItem event={e} bottleTypes={bottleTypes} onOpen={setViewing} />
-          </li>
-        ))}
-      </ol>
+      {/* While it ferments, the day-to-day log comes first; afterwards, the batch as made. */}
+      {fermenting ? [timelineSection, stepsSection] : [stepsSection, timelineSection]}
 
       {viewing && <PhotoViewer attachment={viewing} onClose={() => setViewing(null)} />}
     </Screen>
