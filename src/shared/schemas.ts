@@ -205,3 +205,47 @@ export function parseStepParams(type: StepType, params: unknown) {
 export function parseEventPayload(type: EventType, payload: unknown) {
   return v.safeParse(EventPayload[type], payload ?? {});
 }
+
+// --- Recipes (SPEC §7.3) ---
+
+export const BASES = ['peppers', 'solids', 'ferment_total', 'mash', 'sauce'] as const;
+
+const Percent = v.pipe(v.number(), v.finite(), v.minValue(0));
+
+// `remainder` is reserved and not offered in v1.
+export const RecipeLine = v.pipe(
+  v.object({
+    id: Id,
+    step_index: Position,
+    step_type: v.picklist(STEP_TYPES),
+    position: v.optional(Position),
+    name: Name,
+    kind: v.picklist(KINDS),
+    mode: v.picklist(['grams', 'percent']),
+    grams: v.optional(v.nullable(Grams)),
+    percent: v.optional(v.nullable(Percent)),
+    base: v.optional(v.nullable(v.picklist(BASES))),
+    solve_for_heat: v.optional(v.boolean()),
+    variety_id: v.optional(v.nullable(Id)),
+    catalog_id: v.optional(v.nullable(Id)),
+  }),
+  v.check((l) => l.mode !== 'percent' || (l.percent != null && l.base != null), 'A percent line needs a percent and a base'),
+  v.check((l) => !l.solve_for_heat || l.mode === 'grams', 'Only a grams line can be solved for heat'),
+);
+
+const RecipeLines = v.pipe(
+  v.array(RecipeLine),
+  v.check((lines) => lines.filter((l) => l.solve_for_heat).length <= 1, 'At most one line can be solved for heat'),
+);
+
+export const Recipe = resource(
+  { name: Name },
+  { notes_md: Text, heat_target_shu: v.nullable(Shu), lines: RecipeLines },
+);
+
+export const RecipeEvaluate = v.object({
+  grams: v.optional(v.record(Id, Grams)),
+  mash_g: v.optional(v.nullable(Grams)),
+});
+
+export const SaveAsRecipe = v.object({ id: Id, name: v.optional(Name) });

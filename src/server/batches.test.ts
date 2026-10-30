@@ -305,12 +305,6 @@ describe('events', () => {
   });
 });
 
-describe('later milestones', () => {
-  it('answers later-milestone routes with 501', async () => {
-    expect((await t.call('GET', '/api/recipes')).status).toBe(501);
-  });
-});
-
 describe('merging and deleting entries', () => {
   async function lineIn(name: string, kind: string, extra: Record<string, unknown> = {}) {
     const batch = await newBatch();

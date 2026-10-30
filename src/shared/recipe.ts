@@ -176,7 +176,8 @@ export interface BatchLineForRecipe {
   catalog_id: string | null;
 }
 
-export type DraftRecipeLine = Omit<RecipeLine, 'id' | 'shu_min' | 'shu_max'> & {
+export type DraftRecipeLine = Omit<RecipeLine, 'id' | 'shu_min' | 'shu_max' | 'mode'> & {
+  mode: 'grams' | 'percent';
   variety_id: string | null;
   catalog_id: string | null;
 };
