@@ -24,7 +24,7 @@ const BackButton = ({ to }: { to: string }) => (
 export function MoreMenu() {
   const settings = useQuery<Settings>('/api/settings').data;
   return (
-    <Screen title={t('more.title')} footer={<BackButton to="/" />}>
+    <Screen title={t('kitchen.title')} footer={<BackButton to="/" />}>
       <RowList>
         <LinkRow title={t('catalog.title')} hint={t('more.catalogHint')} onClick={() => navigate('/catalog')} />
         <LinkRow title={t('varieties.title')} hint={t('more.varietiesHint')} onClick={() => navigate('/varieties')} />

@@ -30,9 +30,10 @@ const en = {
   'list.empty': 'No batches yet. Start the first one below.',
   'list.new': 'New batch',
   'list.day': 'Day {n}',
-  'list.more': 'More',
+  'list.more': 'Kitchen',
 
   'more.title': 'More',
+  'kitchen.title': 'Kitchen',
   'more.catalogHint': 'Ingredients other than peppers',
   'more.varietiesHint': 'Varieties, SHU and lots',
   'more.bottlesHint': 'Bottles you use regularly',
