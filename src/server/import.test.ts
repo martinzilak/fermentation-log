@@ -76,7 +76,8 @@ describe('seed import (SPEC §7.2 acceptance values)', () => {
   });
 
   it('creates one lot per variety and source, reusing it across batches', () => {
-    expect(db.prepare('SELECT COUNT(*) FROM varieties').pluck().get()).toBe(13);
+    // The seed's varieties; those only the 2026 recipes use (migration 0006) are left out.
+    expect(db.prepare("SELECT COUNT(*) FROM varieties WHERE author <> 'system' OR id IN (SELECT variety_id FROM ingredient_lines)").pluck().get()).toBe(13);
     expect(db.prepare('SELECT COUNT(*) FROM pepper_lots').pluck().get()).toBe(13);
     const lot = db
       .prepare("SELECT l.* FROM pepper_lots l JOIN varieties v ON v.id = l.variety_id WHERE v.name = 'Habanero Yellow'")
@@ -95,10 +96,8 @@ describe('seed import (SPEC §7.2 acceptance values)', () => {
     expect(db.prepare('SELECT COUNT(*) FROM ingredient_lines WHERE catalog_id IS NULL AND variety_id IS NULL').pluck().get()).toBe(0);
     expect(db.prepare("SELECT COUNT(*) FROM ingredient_lines WHERE name = 'Red onion'").pluck().get()).toBe(2);
     const created = db.prepare("SELECT name, kind FROM catalog_items WHERE author = 'import' ORDER BY name").all();
-    expect(created).toEqual([
-      { name: 'Brine', kind: 'brine' },
-      { name: 'Mash', kind: 'mash' },
-    ]);
+    // Brine came with the 2026 recipes (migration 0006).
+    expect(created).toEqual([{ name: 'Mash', kind: 'mash' }]);
   });
 });
 

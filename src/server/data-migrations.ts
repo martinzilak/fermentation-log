@@ -3,7 +3,9 @@
 // the same transaction.
 import type { DataMigrations } from './db.ts';
 import { linkLines } from './entries.ts';
+import { addPlannedRecipes } from './season-2026.ts';
 
 export const DATA_MIGRATIONS: DataMigrations = {
   4: linkLines,
+  6: addPlannedRecipes,
 };

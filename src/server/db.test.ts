@@ -3,7 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { snapshot } from './backup.ts';
+import { evaluateRecipe, type RecipeLine } from '../shared/recipe.ts';
 import { migrate, openDb, readMigrations } from './db.ts';
+import { recipeView } from './routes/recipes.ts';
 
 let dir: string;
 beforeEach(() => {
@@ -89,6 +91,68 @@ describe('migration 0004 (normalized ingredients)', () => {
     expect(db.prepare("SELECT aliases FROM varieties WHERE id = 'v'").pluck().get()).toBe('["Jalapeno červené"]');
     expect(db.prepare("SELECT COUNT(*) FROM varieties WHERE name = 'Jalapeño Red'").pluck().get()).toBe(1);
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    db.close();
+  });
+
+  it('gives existing recipes the steps their lines imply', () => {
+    const db = openDb(':memory:');
+    migrate(db, readMigrations().filter((m) => m.version <= 4));
+    const audit = "'2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', 'me'";
+    db.exec(`
+      INSERT INTO recipes (id, name, created_at, updated_at, author) VALUES ('r', 'Old', ${audit});
+      INSERT INTO recipe_lines (id, recipe_id, step_index, step_type, position, name, kind, mode, grams, created_at, updated_at, author) VALUES
+        ('a', 'r', 0, 'ferment', 0, 'Habanero', 'pepper', 'grams', 100, ${audit}),
+        ('b', 'r', 0, 'ferment', 1, 'Garlic', 'aromatic', 'grams', 5, ${audit}),
+        ('c', 'r', 2, 'blend', 0, 'Vinegar', 'acid', 'grams', 10, ${audit});
+    `);
+    migrate(db, readMigrations().filter((m) => m.version <= 5));
+    expect(db.prepare("SELECT step_index, type FROM recipe_steps WHERE recipe_id = 'r' ORDER BY step_index").all()).toEqual([
+      { step_index: 0, type: 'ferment' },
+      { step_index: 2, type: 'blend' },
+    ]);
+    db.close();
+  });
+
+  it('deletes the batches made in the app, keeps the imported ones and adds the 2026 recipes', () => {
+    const db = openDb(':memory:');
+    migrate(db, readMigrations().filter((m) => m.version <= 5));
+    const at = "'2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'";
+    db.exec(`
+      INSERT INTO batches (id, number, created_at, updated_at, author) VALUES ('old', 1, ${at}, 'import'), ('test', 5, ${at}, 'me');
+      INSERT INTO steps (id, batch_id, position, type, created_at, updated_at, author) VALUES
+        ('s1', 'old', 0, 'ferment', ${at}, 'import'), ('s5', 'test', 0, 'ferment', ${at}, 'me');
+      INSERT INTO ingredient_lines (id, batch_id, step_id, position, name, kind, created_at, updated_at, author) VALUES
+        ('l1', 'old', 's1', 0, 'Water', 'water', ${at}, 'import'), ('l5', 'test', 's5', 0, 'Water', 'water', ${at}, 'me');
+      INSERT INTO events (id, batch_id, type, occurred_at, created_at, updated_at, author) VALUES
+        ('e5', 'test', 'photo', '2026-10-02T00:00:00.000Z', ${at}, 'me');
+      INSERT INTO attachments (id, event_id, type, file, created_at, author) VALUES ('a5', 'e5', 'photo', 'x.jpg', '2026-10-02T00:00:00.000Z', 'me');
+      INSERT INTO recipes (id, name, created_from_batch_id, created_at, updated_at, author) VALUES ('r', 'Mine', 'test', ${at}, 'me');
+    `);
+    migrate(db);
+    const count = (table: string) => db.prepare(`SELECT COUNT(*) FROM ${table}`).pluck().get();
+    expect(db.prepare('SELECT id FROM batches').pluck().all()).toEqual(['old']);
+    expect([count('steps'), count('ingredient_lines'), count('events'), count('attachments')]).toEqual([1, 1, 0, 0]);
+    expect(db.prepare("SELECT created_from_batch_id FROM recipes WHERE id = 'r'").pluck().get()).toBeNull();
+
+    expect(count('recipes')).toBe(7);
+    const sriracha = recipeView(db, '69af6d37-8adf-4fe6-b46c-4bad9eeff945')!;
+    expect(sriracha.steps.map((s) => s.type)).toEqual(['ferment', 'blend', 'cook', 'blend', 'strain']);
+    const lines = sriracha.lines as unknown as RecipeLine[];
+    expect(lines.map((l) => [l.name, l.mode, l.grams ?? l.percent, l.base])).toEqual([
+      ['Jalapeño Red', 'grams', 800, null],
+      ['Habanero Red', 'grams', 80, null],
+      ['Garlic', 'percent', 11.36, 'peppers'],
+      ['Water', 'percent', 100, 'solids'],
+      ['Salt', 'percent', 3, 'ferment_total'],
+      ['Spirit vinegar 8 %', 'percent', 12.24, 'mash'],
+      ['Brine', 'percent', 15.31, 'mash'],
+      ['Cane sugar', 'percent', 3.06, 'mash'],
+      ['Xanthan gum', 'percent', 0.15, 'sauce'],
+    ]);
+    // With the mash the plan expects, the recipe gives back the plan's grams, salt at 3 %.
+    const planned = evaluateRecipe(lines, { mash_g: 980 }).lines.map((l) => l.grams);
+    expect(planned.slice(0, 8)).toEqual([800, 80, 100, 980, 58.8, 120, 150, 30]);
+    expect(db.prepare("SELECT COUNT(*) FROM recipe_lines WHERE catalog_id IS NULL AND variety_id IS NULL").pluck().get()).toBe(0);
     db.close();
   });
 });
