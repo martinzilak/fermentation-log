@@ -79,12 +79,13 @@ function planText(plan: Plan | null): string {
   return plan?.rule ?? t('weigh.noPlan');
 }
 
-/** "+3 g · +6 %" */
+/** "+3 g · +6 %"; each sign follows its rounded number, so nothing reads "−0 %". */
 function deviation(actual: number, planned: number): string {
   const sign = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '±');
   const diff = round2(actual - planned);
-  const pct = planned > 0 ? ` · ${sign(diff)}${Math.abs((diff / planned) * 100).toFixed(0)} %` : '';
-  return `${sign(diff)}${formatGrams(Math.abs(diff))}${pct}`;
+  const pct = planned > 0 ? Math.round((diff / planned) * 100) : null;
+  const pctText = pct === null ? '' : ` · ${sign(pct)}${Math.abs(pct)}\u00a0%`;
+  return `${sign(diff)}${formatGrams(Math.abs(diff))}${pctText}`;
 }
 
 function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
@@ -419,6 +420,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
               <p className="text-right">
                 <span className="block text-lg text-muted-foreground">{t('weigh.planLabel')}</span>
                 <span className="text-5xl font-bold tabular-nums">{planned?.grams != null ? formatNumber(planned.grams) : '—'}</span>
+                {planned?.grams != null && <span className="ml-1 text-3xl font-medium text-muted-foreground">g</span>}
                 {planned?.grams == null && <span className="block text-base text-muted-foreground">{planText(planned)}</span>}
               </p>
             </div>

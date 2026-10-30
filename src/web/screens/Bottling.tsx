@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { stepTypeLabel, t } from '@/lib/i18n';
-import { formatGrams, formatNumber, parseDecimal } from '@/lib/numbers';
+import { formatGrams, formatMl, formatNumber, parseDecimal } from '@/lib/numbers';
 import { invalidate, missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import { readLocal, writeLocal } from '@/lib/storage';
@@ -234,7 +234,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
           <h2 className="mb-2 text-lg text-muted-foreground">{t('bottle.addFill')}</h2>
           <Chips>
             {bottleTypes.map((b) => (
-              <Chip key={b.id} hint={`${formatNumber(b.volume_ml)} ml`} onClick={() => go({ name: 'count', fill: { bottle_type_id: b.id }, title: b.name })}>
+              <Chip key={b.id} hint={formatMl(b.volume_ml)} onClick={() => go({ name: 'count', fill: { bottle_type_id: b.id }, title: b.name })}>
                 {b.name}
               </Chip>
             ))}

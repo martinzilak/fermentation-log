@@ -9,7 +9,7 @@ import { PhotoButton } from '@/components/PhotoButton';
 import { Button } from '@/components/ui/button';
 import { dayNumber, formatDay, formatStamp, stars } from '@/lib/format';
 import { eventLabel, stepTypeLabel, t } from '@/lib/i18n';
-import { formatGrams, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
+import { formatGrams, formatMl, formatNumber, formatPct, formatShuRange } from '@/lib/numbers';
 import { acceptPress } from '@/lib/press';
 import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
@@ -94,7 +94,7 @@ export function BatchDetail({ id }: { id: string }) {
         {d.sauce_additions_g > 0 && <Stat label={t('detail.additions')}>{formatGrams(d.measured_total_g ?? d.sauce_additions_g)}</Stat>}
         {d.xanthan_pct !== null && <Stat label={t('detail.xanthan')}>{formatPct(d.xanthan_pct, 3)}</Stat>}
         {d.bottled_volume_ml !== null && d.bottled_volume_ml > 0 && (
-          <Stat label={t('detail.bottledVolume')}>{`${formatNumber(d.bottled_volume_ml)} ml`}</Stat>
+          <Stat label={t('detail.bottledVolume')}>{formatMl(d.bottled_volume_ml)}</Stat>
         )}
       </section>
 
@@ -230,9 +230,9 @@ function EventItem({ event: e, bottleTypes, onOpen }: { event: EventView; bottle
 }
 
 export function fillName(f: Fill, bottleTypes: BottleType[]): string {
-  if ('volume_ml' in f) return [f.label, `${formatNumber(f.volume_ml)} ml`].filter(Boolean).join(' · ');
+  if ('volume_ml' in f) return [f.label, formatMl(f.volume_ml)].filter(Boolean).join(' · ');
   const type = bottleTypes.find((b) => b.id === f.bottle_type_id);
-  return type ? `${type.name} · ${formatNumber(type.volume_ml)} ml` : '?';
+  return type ? `${type.name} · ${formatMl(type.volume_ml)}` : '?';
 }
 
 function PhotoViewer({ attachment, onClose }: { attachment: Attachment; onClose: () => void }) {

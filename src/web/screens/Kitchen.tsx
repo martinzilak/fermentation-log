@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { formatDay, formatStamp } from '@/lib/format';
 import { t } from '@/lib/i18n';
-import { formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
+import { formatMl, formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import type { BottleType, ExportStatus, Settings } from '@/lib/types';
@@ -68,7 +68,7 @@ export function ExportScreen() {
   );
 }
 
-const volume = (ml: number) => `${formatNumber(ml)} ml`;
+const volume = formatMl;
 
 export function BottleTypeList() {
   const toast = useToast();

@@ -25,9 +25,11 @@ export function parseDecimal(text: string): number | null {
 const grams = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 const shu = new Intl.NumberFormat('en', { maximumSignificantDigits: 2 });
 
+// Units hang on their number with a no-break space, so "77 g" never wraps.
 export const formatNumber = (n: number) => grams.format(n);
-export const formatGrams = (g: number) => `${grams.format(g)} g`;
-export const formatPct = (p: number, digits = 2) => `${p.toFixed(digits)} %`;
+export const formatGrams = (g: number) => `${grams.format(g)}\u00a0g`;
+export const formatMl = (ml: number) => `${grams.format(ml)}\u00a0ml`;
+export const formatPct = (p: number, digits = 2) => `${p.toFixed(digits)}\u00a0%`;
 
 /** "≈ 17,000–50,000 SHU"; a single value when both ends round the same. */
 export function formatShuRange(low: number, high: number): string {
