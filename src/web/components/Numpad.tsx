@@ -87,7 +87,7 @@ export function Readout({ value, unit, label, aside, below, tag, fill }: Readout
       {(label || aside) && (
         <div className={row}>
           <span>{keepUnits(label)}</span>
-          <span className="text-right">{aside}</span>
+          <span className="text-right">{keepUnits(aside)}</span>
         </div>
       )}
       <p className="text-right font-display text-7xl leading-none font-bold tabular-nums" aria-live="polite">
@@ -97,8 +97,8 @@ export function Readout({ value, unit, label, aside, below, tag, fill }: Readout
       {fill != null && <Ruler fill={fill} />}
       {(below || tag) && (
         <div className={cn(row, 'mt-1')}>
-          <span>{below}</span>
-          {tag && <span className="rounded-sm bg-lcd-tick px-1.5 text-lcd-foreground">{tag}</span>}
+          <span>{keepUnits(below)}</span>
+          {tag && <span className="rounded-sm bg-lcd-tick px-1.5 text-lcd-foreground">{keepUnits(tag)}</span>}
         </div>
       )}
     </div>
