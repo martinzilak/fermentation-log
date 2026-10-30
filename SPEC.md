@@ -353,14 +353,14 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
    - One card per batch: number, colour dot, status, and a day counter for fermenting batches ("Day 7").
    - Newest first. A big **New batch** button.
 2. **New batch**
-   - Choose "from recipe" or "blank".
-   - Then: number and start date (default today), then weighing mode, which starts with the vessel and tare (§8.1 item 6) and continues with the ferment additions.
+   - Number and start date (default today), whether the container needs burping (§15.11), then "from recipe" or "blank".
+   - Then weighing mode, which starts with the vessel and tare (§8.1 item 6) and continues with the ferment additions.
    - Live salt % and suggested salt are shown throughout.
 3. **Batch detail**
    - Header: key stats (salt %, days, status, heat range).
    - Steps with their additions.
    - Timeline, newest first, with thumbnails and audio players.
-   - Bottom bar: **Photo**, **Voice**, **pH**, **Note**, **More** (weigh, burp, issue, tasting).
+   - Bottom bar: **Photo**, **Voice**, **pH**, **Note**, **More** (weigh, issue, tasting); **Burped** for a jar that needs burping (§15.11).
    - **Add step** button (blend / cook / strain / rest / other), which opens weighing mode for that step's additions.
 4. **Bottling checklist**
    - Fills: pick a bottle type and a count, with repeatable rows; add a new bottle type inline.
@@ -372,7 +372,7 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
 7. **Varieties and lots:** edit pepper reference data; add lots per season.
 8. **Catalog and bottle types:** small edit lists.
 9. **Export:** download a zip of everything, or a single batch `.md`. Shows the last nightly export time.
-10. **Settings:** target salt %; in M6, notifications and the nudge schedule.
+10. **Settings:** target salt %; in M6, notifications and the list of reminders (§15.11).
 
 ### 8.3 Photos
 
@@ -405,11 +405,7 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
   - New entries queue in the outbox.
 - **Subscribing.** This (one time per device) needs the server reachable.
 - **iOS requirements.** The app must be installed to the Home Screen. The permission prompt must be triggered by a user tap ("Enable reminders" button). Every push must show a notification, because Safari revokes permission for invisible pushes.
-- **Scheduler.** In-process. Rules are configurable in Settings:
-  - photo prompt on day 0
-  - optional daily burp reminder
-  - photo + pH prompt on days 7 and 14
-  - "ready for the next step?" at N days (default 14)
+- **Scheduler.** In-process. The reminders are a list of rules edited in Settings (§15.11): an action (photo, burp, pH check, own text) on a ferment day, repeating every few days or once, from an hour.
 - **Quiet hours:** 22:00–08:00.
 
 ## 10. Export and import
@@ -677,6 +673,8 @@ Asked for after M5, when loading the season's planned recipes.
 
 ### 15.10 Details settled while building M6
 
+The schedule below was replaced by a list of rules after the M6 review (§15.11); the rest still holds.
+
 - **The reminder hour** (`nudge_hour`, 8–21, default 18) is when the day's reminders start. A reminder that couldn't go out (no device subscribed, server down, push service failing) is tried every 5 minutes until the quiet hours, then let go. `nudges_sent (batch_id, day)` records a day once a device received it.
 - **One reminder per batch per ferment day**, saying everything due that day: a photo on day 0; a photo and the pH on days 7 and 14; the burp from day 1 when on; "Ready for the next step?" on the ready day. Whatever was already logged that day (photo, pH, burp) is left out, and a day with nothing left sends nothing. Only batches that are fermenting and have a ferment date get reminders; day 0 is the ferment date in the server's time zone.
 - **The notification** is titled `#N Name · day D`, opens the batch, and replaces an earlier one for the same batch.
@@ -684,3 +682,22 @@ Asked for after M5, when loading the season's planned recipes.
 - **Subscriptions** are stored by endpoint and dropped when the push service answers 404 or 410. They aren't in the export: they belong to a device, and a restored backup re-registers each phone the next time it opens Settings.
 - **Without VAPID keys** the server runs as before, `GET /api/push` returns no key and the subscribe and test routes answer 409 (not 503, which the app reads as offline). Settings says reminders aren't set up.
 - **Settings has "Send a test"**, which pushes to that phone only, to check the setup without waiting for a ferment day.
+
+### 15.11 Owner review after M6 — 2026-10-30 — **Decided**
+
+- **Burping is per batch.** Only a sealed jar needs burping; a crock with a water seal or an airlock burps itself. New batch asks which (starting from this phone's last answer), the ferment step stores it as `params.needs_burping`, and the edit screen can change it. A batch that needs burping gets **Burped** in its main buttons while it ferments; More no longer has it.
+- **pH is the "ready to end the ferment?" check**, separate from burping and from photos.
+- **Reminders are a list of rules** (`reminder_rules`): an action (`photo`, `burp`, `ph`, or `custom` with its own text), the ferment day it starts on, every how many days it repeats (0: once) and the hour it goes out from (8–21). Settings edits the list; each change saves the whole list (`PUT /api/reminders`) with Undo. Burp rules only reach batches that need burping. Rules due for a batch at the same time share one notification; a rule whose action was already logged that day (photo, burp, pH) is left out. `reminders_sent (batch_id, rule_id, day)` records each rule once a device got it.
+- **Days count from 1:** the start date is Day 1, in the app and in reminders alike.
+- **Migration 0008** turns the old settings into rules at the old hour: a photo on Day 1 (if it was on), a photo from Day 8 every 7 days (if the checks were on), a pH check from the day after the old "ready" day every 3 days (if set), and a daily burp from Day 2. The `nudge_*` settings and `nudges_sent` go.
+- **Smaller fixes from the review:**
+  - New batch puts the short choices first; recipes are a list, the picked one showing its ferment right under it.
+  - A recipe batch takes the recipe's name.
+  - Weighing: no salt figure until salt is in, a warning at Done when the salt is missing, low or high; with a container on, the big number is the net; plans show before the peppers are weighed (counting their plan), with a unit; a mash without a plan gets an estimate (the ferment's solids); the container doesn't carry over to the next ingredient; "Sauce" instead of "Additions" once the mash is in.
+  - Back from the crock tare of an untouched new batch discards it, with Undo.
+  - Step cards show the recipe's method, their lines open for editing, and the button says "Weigh the rest (N left)". Cook, strain and rest steps without lines don't open an empty weighing screen.
+  - While fermenting, the timeline comes before the steps.
+  - Ingredient search also finds close spellings; the new-name chip comes last.
+  - The double-tap guard only drops a tap near the previous one (§8.1 item 4).
+  - A toast goes along with its own screen change but not a later one.
+  - Numbers keep their units on the same line, and nothing reads "−0 %".

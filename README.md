@@ -141,7 +141,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - Install the app from Safari: **Share → Add to Home Screen**.
 - If it was added before the app had its icon (M0's hello page), remove it and add it again to get the icon and full-screen mode.
 - In the Tailscale app, enable **VPN On Demand** with a rule that connects automatically for `*.ts.net` hostnames.
-- **Reminders:** open the installed app (not Safari), go to **Settings → Reminders → Enable reminders** and allow notifications. Then tap **Send a test**; the notification should arrive within a few seconds, even with Tailscale off. Each phone enables its own reminders; the schedule below is shared. If iOS was asked once and you declined, allow notifications for the app in iOS Settings → Notifications.
+- **Reminders:** open the installed app (not Safari), go to **Settings → Reminders → Enable reminders** and allow notifications. Then tap **Send a test**; the notification should arrive within a few seconds, even with Tailscale off. Each phone enables its own reminders; the list of reminders below it is shared. Each reminder is an action (photo, burp, pH check or your own text) on a ferment day (the start date is Day 1), once or every few days, from an hour. Burp reminders only reach batches whose container needs burping, which New batch asks. If iOS was asked once and you declined, allow notifications for the app in iOS Settings → Notifications.
 - **Without the server** (Tailscale off, NAS down): the app still opens and shows the last data it had. Weighing, notes, pH, photos and the other batch entries are kept on the phone and sent once the server is back; the banner shows how many are waiting. Reference data (catalog, varieties, bottle types, settings, recipes) can only be changed while the server is reachable; a new lot can also be added while weighing offline. Keep the app installed and don't clear Safari's website data while entries are waiting, or they are lost.
 
 ## Troubleshooting
@@ -153,7 +153,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - **"Not saved: the server can't be reached" while weighing offline:** the phone is running a version from before the offline support. Open the app once while connected, then close it fully and reopen it. More shows when the running version was built.
 - **"Syncing: N" doesn't go away:** the server keeps failing one queued entry with an error, and everything after it waits behind it. Check the container log for the failing request.
 - **"The test reminder couldn’t be sent":** the container log has a `Push to … failed` line with the push service's answer. A 403 or `BadJwtToken` means a wrong `VAPID_SUBJECT` or mismatched keys; no answer means the NAS can't reach `*.push.apple.com`.
-- **No reminders arrive, though the test works:** reminders go out only for batches that are fermenting and have a ferment date, from the reminder hour until 22:00, once per batch and day. Anything already logged that day is left out, so a day with everything logged sends nothing.
+- **No reminders arrive, though the test works:** reminders go out only for batches that are fermenting and have a ferment date, from each reminder's hour until 22:00, each reminder once per batch and day. Anything already logged that day is left out, so a day with everything logged sends nothing, and burp reminders skip batches that burp themselves (set on the ferment step's edit screen).
 
 ## Importing batch files
 
