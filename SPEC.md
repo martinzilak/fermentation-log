@@ -350,7 +350,7 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
 ### 8.2 Screens
 
 1. **Batch list**
-   - One card per batch: number, colour dot, status, and a day counter for fermenting batches ("Day 7").
+   - One card per batch: number plate in the cap colour, name, status, and a day counter for fermenting batches ("Day 7"); §15.12.
    - Newest first. A big **New batch** button.
 2. **New batch**
    - Number and start date (default today), whether the container needs burping (§15.11), then "from recipe" or "blank".
@@ -372,7 +372,7 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
 7. **Varieties and lots:** edit pepper reference data; add lots per season.
 8. **Catalog and bottle types:** small edit lists.
 9. **Export:** download a zip of everything, or a single batch `.md`. Shows the last nightly export time.
-10. **Settings:** target salt %; in M6, notifications and the list of reminders (§15.11).
+10. **Settings:** target salt %; in M6, notifications and the list of reminders (§15.11). Catalog, varieties, bottle types, recipes, export and settings are reached from the list's **Kitchen** menu (§15.12).
 
 ### 8.3 Photos
 
@@ -701,3 +701,27 @@ The schedule below was replaced by a list of rules after the M6 review (§15.11)
   - The double-tap guard only drops a tap near the previous one (§8.1 item 4).
   - A toast goes along with its own screen change but not a later one.
   - Numbers keep their units on the same line, and nothing reads "−0 %".
+
+### 15.12 Look and feel — 2026-10-30 — **Decided**
+
+After a design review the owner picked a theme between "Matte" (black and bone, one chilli orange) and "Neon Pass" (neon blocks for live states). Tokens live in `src/web/styles.css`.
+
+- **Follows the phone:** light and dark, from `prefers-color-scheme`. No in-app switch.
+  - Light: bone background `#f4f2ee`, near-black text, white cards.
+  - Dark: matte black `#0b0b0c`, off-white text, `#151517` cards.
+- **Fonts are bundled** (@fontsource), so the app keeps its type offline: Barlow for text, Barlow Condensed for titles, buttons and big numbers, IBM Plex Mono for small labels, dates and grams. The latin files are precached (about 130 KB); other subsets are cached on first use.
+- **One filled primary per screen**, in chilli orange (`#c42b12` light, `#ff4d2e` dark). Logging actions are tonal (secondary), navigation is outlined, destructive is red. Something unavailable is a dashed outline, not a faded fill. A picked chip is inverted (black on white or the reverse), never the primary colour.
+- **Type:** screen titles and buttons in condensed capitals; "pH" keeps its case. Section headings and small labels in mono capitals.
+- **Small radii** (2–6 px): the look is cut, not rounded.
+- **Batch numbers are plates:** the number in a bordered frame, with the cap colour as a band on the left (standard cap colours have fixed tones; other names fall back to CSS colours). This replaces the colour dot in §8.2 item 1.
+- **Status blocks:** fermenting is a neon lime block and processing a teal one, both with black text in either mode; planned is outlined, bottled is a neutral fill, archived is dashed and muted.
+- **Heat is a word and five pips** (mild, warm, medium, hot, very hot), from the midpoint of the SHU range with steps at 1 500, 5 000, 15 000 and 50 000. The range stays as a note.
+- **Readout:** while weighing, the number sits in a dark scale display with a ruler that fills towards the plan and a tag with the deviation. The pH entry uses the same display. The numpad keys look like keycaps and give under the finger.
+- **Smaller changes made with the theme:**
+  - The list's menu is called **Kitchen** (catalog, varieties, bottle types, recipes, export, settings), so it doesn't share a name with the batch's More.
+  - A bottled or archived batch offers **Tasting** instead of Add step.
+  - The batch's tool row is shorter (56 px), still within §8.1 item 1.
+  - Batch stats sit in a two-column grid; an odd last one spans both.
+  - Recipe lines wrap onto rows on a phone instead of cutting off the kind; the heat-goal toggle is a chip.
+  - The bottling check says "(not weighed)" when the step additions weren't weighed.
+- **Icons and brands:** no brand marks or third-party logos in the app.
