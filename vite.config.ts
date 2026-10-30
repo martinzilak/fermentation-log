@@ -39,6 +39,8 @@ export default defineConfig({
         // The app shell (SPEC §8.5). API reads are kept by the app itself
         // (src/web/lib/query.ts); photos never change, so they are cached here.
         navigateFallback: '/index.html',
+        // Shows reminders and opens the batch on a tap (SPEC §9).
+        importScripts: ['/push-sw.js'],
         navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/healthz/],
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
         runtimeCaching: [

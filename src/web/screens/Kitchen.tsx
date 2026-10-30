@@ -13,6 +13,7 @@ import { formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
 import { invalidate, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
 import type { BottleType, ExportStatus, Settings } from '@/lib/types';
+import { Reminders } from '@/screens/Reminders';
 
 const BackButton = ({ to }: { to: string }) => (
   <Button variant="outline" onClick={() => goBack(to)}>
@@ -189,6 +190,7 @@ export function SettingsScreen() {
         />
       )}
       <p className="mt-2 text-base text-muted-foreground">{t('settings.targetSaltHint')}</p>
+      {data && <Reminders settings={data} />}
     </Screen>
   );
 }
