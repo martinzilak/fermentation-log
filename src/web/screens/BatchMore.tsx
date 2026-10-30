@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { api, QUEUED } from '@/lib/api';
 import { stars } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import { formatGrams, parseDecimal } from '@/lib/numbers';
 import { invalidate, useQuery } from '@/lib/query';
@@ -129,6 +130,8 @@ function ChoiceEvent<T extends string | number>(props: {
   title: string;
   choices: readonly T[];
   label: (choice: T) => string;
+  /** Lays the choices out as one row of keycaps, the picked one's word under them. */
+  keys?: (choice: T) => string;
   save: (choice: T, text: string | null) => void;
 }) {
   const [choice, setChoice] = useState<T | null>(null);
@@ -147,13 +150,41 @@ function ChoiceEvent<T extends string | number>(props: {
         </ActionRow>
       }
     >
-      <Chips>
-        {props.choices.map((c) => (
-          <Chip key={c} selected={choice === c} onClick={() => setChoice(c)}>
-            {props.label(c)}
-          </Chip>
-        ))}
-      </Chips>
+      {props.keys ? (
+        <>
+          <div className="grid grid-cols-5 gap-3" role="radiogroup" aria-label={props.title}>
+            {props.choices.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={choice === c}
+                aria-label={props.label(c)}
+                onClick={() => setChoice(c)}
+                className={cn(
+                  'flex h-20 items-center justify-center rounded-lg font-display text-4xl font-bold tabular-nums active:translate-y-px active:shadow-none',
+                  choice === c
+                    ? 'bg-selected text-selected-foreground'
+                    : 'bg-secondary text-secondary-foreground shadow-[inset_0_-3px_0_var(--accent)] active:bg-accent',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 h-9 font-display text-3xl font-bold tracking-wide uppercase" aria-live="polite">
+            {choice !== null && props.keys(choice)}
+          </p>
+        </>
+      ) : (
+        <Chips>
+          {props.choices.map((c) => (
+            <Chip key={c} selected={choice === c} onClick={() => setChoice(c)}>
+              {props.label(c)}
+            </Chip>
+          ))}
+        </Chips>
+      )}
       <Section title={t('event.noteOptional')}>
         <Textarea placeholder={t('note.placeholder')} aria-label={t('event.noteOptional')} value={text} onChange={(e) => setText(e.target.value)} />
       </Section>
@@ -183,7 +214,8 @@ export function TastingEvent({ id }: { id: string }) {
       id={id}
       title={t('event.tastingTitle')}
       choices={RATINGS}
-      label={stars}
+      label={(n) => t('event.rating', { n })}
+      keys={(n) => `${stars(n)} ${t(`tasting.word.${n}`)}`}
       save={(rating, text) => void log('tasting', { payload: { rating }, text }, t('event.tasted', { stars: stars(rating) }))}
     />
   );

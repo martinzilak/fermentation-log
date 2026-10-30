@@ -292,6 +292,11 @@ const en = {
   'event.tastingTitle': 'How does it taste?',
   'event.tasted': 'Tasting {stars} logged',
   'event.rating': '{n} out of 5',
+  'tasting.word.1': 'Off',
+  'tasting.word.2': 'Meh',
+  'tasting.word.3': 'Good',
+  'tasting.word.4': 'Great',
+  'tasting.word.5': 'Best',
 
   'issue.kahm': 'Kahm yeast',
   'issue.mold': 'Mould',
