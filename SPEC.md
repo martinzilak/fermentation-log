@@ -655,3 +655,14 @@ Where this section conflicts with an earlier one, this section wins.
 - **Offline reads.** Responses are kept in IndexedDB and shown when the server can't be reached. The reference lists weighing and bottling need are fetched when the app starts, so they are there offline. Photos are cached by the service worker (the newest 500).
 - **The banner** sits in each screen's pinned header. Offline it shows "Waiting to sync: N"; online, while entries are still being sent, a quiet "Syncing: N".
 - **Limits.** There is no screen to inspect or discard queued entries; a write the server keeps failing blocks the ones after it. The outbox assumes one open tab per device.
+
+### 15.8 Details settled while building M5
+
+- **Bases in a recipe.** Lines on the same base are computed from that base as it stood before any of them, so they don't count towards each other either. The weighed mash stands in for any mash line of the recipe.
+- **Heat goal.** The solve line's grams are found by bisection between 0 g and 10 t. When the goal can't be reached, the message gives the heat range the line can reach, and the line gets no amount.
+- **Save batch as recipe**, for the steps after the ferment, which §7.3 leaves open: thickeners become percent of `sauce`, other additions percent of `mash`, and the mash line itself is left out (it is weighed, not added). A line whose base is empty keeps its grams. The recipe is named after the batch ("Batch #9"), and the request goes through the outbox.
+- **Recipe steps in a batch.** The n-th step of a type in the batch follows the n-th step of that type in the recipe.
+- **Starting from a recipe** creates the ferment step with the recipe's ferment lines, still to weigh. Adding a later step to such a batch creates that recipe step's lines, with a Mash line first when their plan depends on the mash.
+- **Planned vs actual.** A line's plan follows what has actually been weighed so far: percent lines from the real bases, and the heat line solved with the peppers actually weighed. The plan is snapshotted into `planned_g` when the line is weighed. While a base is still empty, the rule ("5 % of peppers") is shown instead of 0 g.
+- **The recipe editor** saves each change at once with Undo, like the other edit screens; a change to a line sends all the lines (PATCH replaces them). `remainder` lines are not offered. There is no delete for recipes yet.
+- **New lot while weighing** (asked for while testing M4): the lot step shows for every known pepper, with a New lot chip for this season's lot (grown from seed or sapling, bought, gift). New lots go through the outbox, so this works offline.
