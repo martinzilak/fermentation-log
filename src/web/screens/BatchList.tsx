@@ -33,7 +33,7 @@ export function BatchList() {
           <li key={b.id}>
             <button
               type="button"
-              onClick={() => acceptPress() && navigate(`/b/${b.id}`)}
+              onClick={(e) => acceptPress(e) && navigate(`/b/${b.id}`)}
               className="flex min-h-20 w-full items-center gap-4 rounded-xl border bg-card px-4 py-3 text-left active:bg-accent"
             >
               <span className="text-3xl font-bold tabular-nums">#{b.number}</span>

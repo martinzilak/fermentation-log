@@ -216,7 +216,7 @@ function EventItem({ event: e, bottleTypes, onOpen }: { event: EventView; bottle
       {photos.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-3">
           {photos.map((a) => (
-            <button key={a.id} type="button" onClick={() => acceptPress() && onOpen(a)} className="overflow-hidden rounded-lg">
+            <button key={a.id} type="button" onClick={(e) => acceptPress(e) && onOpen(a)} className="overflow-hidden rounded-lg">
               <img src={`/media/${a.thumb ?? a.file}`} alt="" loading="lazy" className="size-28 object-cover" />
             </button>
           ))}

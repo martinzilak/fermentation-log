@@ -49,7 +49,7 @@ export function Numpad({ value, onChange, onEnter, decimals = 2, maxInt = 6 }: P
           aria-label={key === 'back' ? t('numpad.delete') : key === '.' ? t('numpad.decimal') : key}
           disabled={key === '.' && decimals === 0}
           // A double tap on the button that opened this screen must not type a digit.
-          onClick={() => !justPressed() && press(key)}
+          onClick={(e) => !justPressed(e) && press(key)}
           className="flex h-14 items-center justify-center rounded-xl bg-secondary text-4xl font-semibold text-secondary-foreground tabular-nums active:bg-accent disabled:opacity-30"
         >
           {key === 'back' ? <Delete className="size-9" /> : key}

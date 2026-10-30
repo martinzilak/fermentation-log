@@ -326,7 +326,7 @@ Assume imprecise input: a knuckle, a gloved finger, a wet finger, phone propped 
 4. **Forgiving.**
    - No confirmation dialogs in flows. Every action shows a large **Undo** toast (8 s).
    - Destructive edits live only in the edit screen.
-   - Primary buttons are debounced (about 500 ms) against accidental double taps.
+   - Primary buttons are debounced (about 500 ms) against accidental double taps. Only a second tap near the first (within about 48 px) is dropped; a quick tap elsewhere goes through.
 5. **Custom numpad for grams.**
    - Full-screen 3×4 keypad with huge keys, decimal key, backspace and a big **Next** button. The iOS keyboard is not used for weights.
    - Accept comma or dot.

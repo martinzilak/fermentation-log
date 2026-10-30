@@ -54,7 +54,7 @@ function Button({
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       // Every button shares the double-tap guard (SPEC §8.1 item 4).
-      onClick={onClick && ((e: React.MouseEvent<HTMLButtonElement>) => acceptPress() && onClick(e))}
+      onClick={onClick && ((e: React.MouseEvent<HTMLButtonElement>) => acceptPress(e) && onClick(e))}
       {...props}
     />
   )

@@ -185,7 +185,7 @@ export function LinkRow({ title, hint, onClick }: { title: ReactNode; hint?: Rea
   return (
     <button
       type="button"
-      onClick={() => acceptPress() && onClick()}
+      onClick={(e) => acceptPress(e) && onClick()}
       className="flex min-h-16 w-full items-center gap-3 rounded-xl border bg-card px-4 py-2 text-left active:bg-accent"
     >
       <span className="flex min-w-0 flex-1 flex-col">
