@@ -1,16 +1,22 @@
 // The Undo toast (SPEC §8.1 item 4): every action shows one for 8 s instead
 // of asking for confirmation. It renders inside the screen footer, above the
-// actions, so it never covers the button the next tap is aimed at.
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+// actions, so it never covers the button the next tap is aimed at. It goes
+// along with the action's own move to another screen, but not with a later
+// one: an Undo on an unrelated screen would undo something out of sight.
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { HttpError, OfflineError } from '@/lib/api';
 import { t } from '@/lib/i18n';
+import { usePath } from '@/lib/router';
 import { cn } from '@/lib/utils';
 
 const DURATION_MS = 8000;
+/** A screen change this soon after the toast is the action's own. */
+const OWN_MOVE_MS = 1000;
 
 interface Toast {
   id: number;
+  born: number;
   message: string;
   tone: 'info' | 'error';
   undo: (() => unknown) | null;
@@ -35,17 +41,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const seq = useRef(0);
+  const path = usePath();
 
   const dismiss = useCallback(() => {
     window.clearTimeout(timer.current);
     setToast(null);
   }, []);
 
+  useEffect(() => {
+    setToast((cur) => (cur && performance.now() - cur.born > OWN_MOVE_MS ? null : cur));
+  }, [path]);
+
   const api = useMemo<ToastApi>(() => {
-    const open = (next: Omit<Toast, 'id'>) => {
+    const open = (next: Omit<Toast, 'id' | 'born'>) => {
       window.clearTimeout(timer.current);
       const id = ++seq.current;
-      setToast({ id, ...next });
+      setToast({ id, born: performance.now(), ...next });
       timer.current = window.setTimeout(() => setToast((cur) => (cur?.id === id ? null : cur)), DURATION_MS);
     };
     const self: ToastApi = {
