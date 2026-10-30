@@ -20,6 +20,8 @@ Open the Vite URL during development. `npm run build` puts the server in `dist/s
 
 The UI uses shadcn/ui components generated into `src/web/components/ui` (`npx shadcn@latest add <name>`). Their sizes are set for wet or gloved fingers (SPEC §8.1); keep that when adding components.
 
+Colours, radii and fonts are tokens in `src/web/styles.css` (light and dark follow the phone; SPEC §15.12). Use the tokens, not raw colours, and keep one filled primary button per screen. Fonts are bundled from `@fontsource` in `src/web/fonts.ts`.
+
 `DEV_USER=<login>` makes the server act as that user without Tailscale headers. The server refuses to start when `DEV_USER` is set together with `NODE_ENV=production`.
 
 npm 11 runs only allow-listed install scripts (`allowScripts` in `package.json`). If `npm ci` warns about a new one, review it, then use `npm install-scripts approve <pkg>`.
