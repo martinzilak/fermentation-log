@@ -227,6 +227,7 @@ const en = {
   'detail.noSteps': 'No steps yet.',
   'detail.addIngredients': 'Add ingredients',
   'detail.weighRest': 'Weigh the rest ({n} left)',
+  'detail.weighMore': 'Weigh {n} more',
   'detail.tare': 'tare {g}',
   'detail.timeline': 'Timeline',
   'detail.noEvents': 'Nothing logged yet.',

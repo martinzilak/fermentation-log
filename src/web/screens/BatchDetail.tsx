@@ -58,6 +58,10 @@ export function BatchDetail({ id }: { id: string }) {
   const needsBurping = fermenting && batch.steps.some((s) => s.type === 'ferment' && s.params.needs_burping === true);
   // Only once something besides salt is in the ferment.
   const fermentIn = batch.steps.some((s) => s.type === 'ferment' && s.lines.some((l) => l.kind !== 'salt' && l.grams !== null));
+  // The first step with lines still to weigh; Add step moves to More meanwhile.
+  const pending = bottled
+    ? undefined
+    : batch.steps.map((step) => ({ step, left: step.lines.filter((l) => l.grams === null).length })).find((p) => p.left > 0);
   const saltNote = fermentIn ? saltWarning(d.salt_pct, targetPct) : null;
 
   const stepsSection = (
@@ -128,11 +132,17 @@ export function BatchDetail({ id }: { id: string }) {
             <Button variant="outline" onClick={() => goBack('/')}>
               {t('detail.batches')}
             </Button>
-            {/* Once bottled, what's left to do is taste it. */}
+            {/* The filled button is what comes next (SPEC §15.13): the rest of the
+                additions, a tasting once bottled, else the next step, which
+                waits as a quiet button while the ferment runs. */}
             {bottled ? (
               <Button onClick={() => navigate(`/b/${id}/tasting`)}>{t('event.tastingAction')}</Button>
+            ) : pending ? (
+              <Button onClick={() => navigate(`/b/${id}/s/${pending.step.id}`)}>{t('detail.weighMore', { n: pending.left })}</Button>
             ) : (
-              <Button onClick={() => navigate(`/b/${id}/add-step`)}>{t('detail.addStep')}</Button>
+              <Button variant={fermenting ? 'secondary' : 'default'} onClick={() => navigate(`/b/${id}/add-step`)}>
+                {t('detail.addStep')}
+              </Button>
             )}
           </ActionRow>
         </>

@@ -71,6 +71,11 @@ export function BatchMore({ id }: { id: string }) {
           {t('event.tastingAction')}
         </Button>
         {!bottled && (
+          <Button variant="secondary" className={`${big} col-span-2`} onClick={() => navigate(`/b/${id}/add-step`, { replace: true })}>
+            {t('detail.addStep')}
+          </Button>
+        )}
+        {!bottled && (
           <Button className={`${big} col-span-2`} onClick={() => navigate(`/b/${id}/bottle`, { replace: true })}>
             {t('bottle.start')}
           </Button>
