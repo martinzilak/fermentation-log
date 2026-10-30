@@ -76,6 +76,15 @@ Keep the image name unqualified (`ferment-log:latest`). Unraid's updater tries a
 6. **Apply:** when the hook starts, it downloads Tailscale, so the first start needs outbound internet. The container log then shows a Tailscale login link. Open it and approve the device on your tailnet.
 7. **Check the updater:** run the user script once more. It should finish with `ferment-log is healthy`. This confirms that Unraid's updater accepts a locally built image (see below).
 
+### Reminders (M6)
+
+Reminders are Web Push notifications, so the server needs a VAPID key pair and outbound HTTPS to `*.push.apple.com`. Without the keys the app runs as before and Settings says reminders aren't set up.
+
+1. **Generate the keys once:** run `npm run vapid` on your computer, or `docker exec ferment-log node dist/server/cli/vapid.js` on the NAS. It prints three lines.
+2. **Add them to the template:** edit the container and add the variables `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`. Set all three or none. The subject is `mailto:` with your real address; Apple's push service wants a real contact there. Never commit the keys.
+3. **Keep the keys:** new keys mean every phone has to enable reminders again.
+4. **On the phone:** see [iPhone](#iphone).
+
 ### If the updater ignores local images
 
 If the deploy stops with "still runs the old image", Unraid's `update_container` did not recreate the container from the local tag. In that case, run a registry on the NAS that is reachable only from the host itself. Docker allows plain HTTP for `localhost` registries without extra config.
@@ -132,6 +141,7 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - Install the app from Safari: **Share → Add to Home Screen**.
 - If it was added before the app had its icon (M0's hello page), remove it and add it again to get the icon and full-screen mode.
 - In the Tailscale app, enable **VPN On Demand** with a rule that connects automatically for `*.ts.net` hostnames.
+- **Reminders:** open the installed app (not Safari), go to **Settings → Reminders → Enable reminders** and allow notifications. Then tap **Send a test**; the notification should arrive within a few seconds, even with Tailscale off. Each phone enables its own reminders; the schedule below is shared. If iOS was asked once and you declined, allow notifications for the app in iOS Settings → Notifications.
 - **Without the server** (Tailscale off, NAS down): the app still opens and shows the last data it had. Weighing, notes, pH, photos and the other batch entries are kept on the phone and sent once the server is back; the banner shows how many are waiting. Reference data (catalog, varieties, bottle types, settings, recipes) can only be changed while the server is reachable; a new lot can also be added while weighing offline. Keep the app installed and don't clear Safari's website data while entries are waiting, or they are lost.
 
 ## Troubleshooting
@@ -142,6 +152,8 @@ If check 3 or 4 fails, use the Compose fallback in SPEC §3.1 (a `tailscale/tail
 - **"Can't reach the server":** Tailscale is off on the device.
 - **"Not saved: the server can't be reached" while weighing offline:** the phone is running a version from before the offline support. Open the app once while connected, then close it fully and reopen it. More shows when the running version was built.
 - **"Syncing: N" doesn't go away:** the server keeps failing one queued entry with an error, and everything after it waits behind it. Check the container log for the failing request.
+- **"The test reminder couldn’t be sent":** the container log has a `Push to … failed` line with the push service's answer. A 403 or `BadJwtToken` means a wrong `VAPID_SUBJECT` or mismatched keys; no answer means the NAS can't reach `*.push.apple.com`.
+- **No reminders arrive, though the test works:** reminders go out only for batches that are fermenting and have a ferment date, from the reminder hour until 22:00, once per batch and day. Anything already logged that day is left out, so a day with everything logged sends nothing.
 
 ## Importing batch files
 
