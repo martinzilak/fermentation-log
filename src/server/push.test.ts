@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig } from './config.ts';
 import { dumpTables } from './export.ts';
-import { dueNudges, nudgeText, runNudges, type NudgeSettings } from './nudges.ts';
+import { dueNudges, ruleOnDay, runNudges } from './nudges.ts';
 import type { Notice, PushResult, PushSender, Subscription } from './push.ts';
 import { testApp } from './test-support.ts';
 
@@ -71,63 +71,77 @@ describe('push subscriptions (SPEC §9)', () => {
     expect(Object.keys(dumpTables(t.db))).not.toContain('push_subscriptions');
   });
 
-  it('keeps the reminder hour out of the quiet hours', async () => {
+  it('keeps reminder rules out of the quiet hours and own reminders worded', async () => {
     t = testApp();
-    expect((await t.call('PATCH', '/api/settings', { nudge_hour: 7 })).status).toBe(400);
-    expect((await t.call('PATCH', '/api/settings', { nudge_hour: 22 })).status).toBe(400);
-    expect((await t.call('PATCH', '/api/settings', { nudge_burp: 1, nudge_hour: 9 })).body).toMatchObject({ nudge_burp: 1, nudge_hour: 9 });
+    const rule = { id: id(), action: 'photo', first_day: 1, every_days: 0, hour: 9 };
+    expect((await t.call('PUT', '/api/reminders', [{ ...rule, hour: 7 }])).status).toBe(400);
+    expect((await t.call('PUT', '/api/reminders', [{ ...rule, hour: 22 }])).status).toBe(400);
+    expect((await t.call('PUT', '/api/reminders', [{ ...rule, action: 'custom' }])).status).toBe(400);
+    const saved = await t.call('PUT', '/api/reminders', [rule, { ...rule, id: id(), action: 'custom', text: ' Top up the brine ' }]);
+    expect(saved.body).toMatchObject([{ action: 'photo', text: null }, { action: 'custom', text: 'Top up the brine' }]);
   });
 });
 
-describe('nudges (SPEC §9)', () => {
-  const settings: NudgeSettings = { hour: 18, day0Photo: true, checks: true, burp: false, readyDays: 14 };
-
-  it('says what is due on a ferment day, leaving out what was logged', () => {
-    const none = new Set<string>();
-    expect(nudgeText(0, settings, none)).toBe('Take a photo.');
-    expect(nudgeText(3, settings, none)).toBeNull();
-    expect(nudgeText(7, settings, none)).toBe('Take a photo and measure the pH.');
-    expect(nudgeText(7, settings, new Set(['ph']))).toBe('Take a photo.');
-    expect(nudgeText(7, settings, new Set(['photo', 'ph']))).toBeNull();
-    expect(nudgeText(14, settings, new Set(['photo']))).toBe('Measure the pH. Ready for the next step?');
-    expect(nudgeText(3, { ...settings, burp: true }, none)).toBe('Burp the jar.');
-    expect(nudgeText(0, { ...settings, burp: true, day0Photo: false }, none)).toBeNull();
-    expect(nudgeText(14, { ...settings, checks: false, readyDays: 0 }, none)).toBeNull();
+describe('reminders (SPEC §9, §15.11)', () => {
+  it('turns the old schedule into rules', () => {
+    t = testApp();
+    expect(t.db.prepare('SELECT action, first_day, every_days, hour FROM reminder_rules ORDER BY position').all()).toEqual([
+      { action: 'photo', first_day: 1, every_days: 0, hour: 18 },
+      { action: 'photo', first_day: 8, every_days: 7, hour: 18 },
+      { action: 'ph', first_day: 15, every_days: 3, hour: 18 },
+      { action: 'burp', first_day: 2, every_days: 1, hour: 18 },
+    ]);
+    expect(t.db.prepare("SELECT COUNT(*) FROM settings WHERE key LIKE 'nudge%'").pluck().get()).toBe(0);
   });
 
-  async function fermentingBatch(date: string) {
+  it('falls on its first day and then every few days', () => {
+    expect([1, 2, 8].map((d) => ruleOnDay({ first_day: 1, every_days: 0 }, d))).toEqual([true, false, false]);
+    expect([7, 8, 14, 15, 22].map((d) => ruleOnDay({ first_day: 8, every_days: 7 }, d))).toEqual([false, true, false, true, true]);
+  });
+
+  async function fermentingBatch(date: string, needsBurping = false, number = 5) {
     const batchId = id();
-    await t.call('POST', '/api/batches', { id: batchId, number: 5, name: 'Sriracha' });
-    await t.call('POST', `/api/batches/${batchId}/steps`, { id: id(), type: 'ferment', date });
+    await t.call('POST', '/api/batches', { id: batchId, number, name: 'Sriracha' });
+    await t.call('POST', `/api/batches/${batchId}/steps`, { id: id(), type: 'ferment', date, params: needsBurping ? { needs_burping: true } : {} });
     return batchId;
   }
 
-  it('sends from the reminder hour, once per day, never in the quiet hours', async () => {
+  const rule = (action: string, first_day: number, every_days: number, hour: number, text?: string) => ({ id: id(), action, first_day, every_days, hour, ...(text ? { text } : {}) });
+
+  it('sends what is due from each rule’s hour, together, once, leaving out what was logged', async () => {
     const fake = fakeSender();
     t = testApp(undefined, undefined, undefined, fake.send);
     t.setNow('2026-10-29T10:00:00.000Z');
+    await t.call('PUT', '/api/reminders', [rule('photo', 8, 7, 18), rule('ph', 8, 0, 18), rule('custom', 1, 1, 9, 'Top up the brine.'), rule('burp', 2, 1, 9)]);
     const batchId = await fermentingBatch('2026-10-23');
     const deps = { db: t.db, timeZone: 'Europe/Bratislava', send: fake.send };
 
-    // 30 Oct is day 7. Bratislava is UTC+1.
-    expect(await runNudges(deps, new Date('2026-10-30T16:00:00.000Z'))).toBe(0);
-    expect(t.db.prepare('SELECT COUNT(*) FROM nudges_sent').pluck().get()).toBe(0);
+    // 30 Oct is Day 8. Bratislava is UTC+1.
+    expect(await runNudges(deps, new Date('2026-10-30T09:00:00.000Z'))).toBe(0);
     await t.call('POST', '/api/push/subscribe', { id: id(), endpoint: 'https://web.push.apple.com/a', keys });
-    expect(dueNudges(t.db, new Date('2026-10-30T16:59:00.000Z'), deps.timeZone)).toEqual([]);
-    expect(dueNudges(t.db, new Date('2026-10-30T21:30:00.000Z'), deps.timeZone)).toEqual([]);
+    expect(dueNudges(t.db, new Date('2026-10-30T07:30:00.000Z'), deps.timeZone)).toEqual([]);
+    // At 10:00 only the 9 o'clock rules; no burp, as this jar doesn't need it.
+    expect(await runNudges(deps, new Date('2026-10-30T09:05:00.000Z'))).toBe(1);
+    expect(fake.sent[0]!.notice).toEqual({ title: '#5 Sriracha · Day 8', body: 'Top up the brine.', url: `/b/${batchId}`, tag: `batch-${batchId}` });
+    expect(await runNudges(deps, new Date('2026-10-30T09:10:00.000Z'))).toBe(0);
 
-    // A pH logged earlier today is left out.
-    const ph = await t.call('POST', `/api/batches/${batchId}/events`, {
-      id: id(),
-      type: 'ph',
-      occurred_at: '2026-10-30T08:00:00.000Z',
-      payload: { value: 3.9, method: 'strip' },
-    });
-    expect(ph.status).toBe(201);
+    // A pH logged earlier today is left out of the evening one.
+    await t.call('POST', `/api/batches/${batchId}/events`, { id: id(), type: 'ph', occurred_at: '2026-10-30T08:00:00.000Z', payload: { value: 3.9, method: 'strip' } });
     expect(await runNudges(deps, new Date('2026-10-30T17:05:00.000Z'))).toBe(1);
-    expect(fake.sent[0]!.notice).toEqual({ title: '#5 Sriracha · day 7', body: 'Take a photo.', url: `/b/${batchId}`, tag: `batch-${batchId}` });
-    expect(await runNudges(deps, new Date('2026-10-30T17:10:00.000Z'))).toBe(0);
-    expect(fake.sent).toHaveLength(1);
+    expect(fake.sent[1]!.notice.body).toBe('Take a photo.');
+    expect(dueNudges(t.db, new Date('2026-10-30T20:00:00.000Z'), deps.timeZone)).toEqual([]);
+    expect(dueNudges(t.db, new Date('2026-10-30T21:30:00.000Z'), deps.timeZone)).toEqual([]);
+  });
+
+  it('reminds to burp only the jars that need it', async () => {
+    const fake = fakeSender();
+    t = testApp(undefined, undefined, undefined, fake.send);
+    t.setNow('2026-10-29T10:00:00.000Z');
+    await t.call('PUT', '/api/reminders', [rule('burp', 2, 1, 9)]);
+    await fermentingBatch('2026-10-28');
+    const sealed = await fermentingBatch('2026-10-28', true, 6);
+    const due = dueNudges(t.db, new Date('2026-10-30T09:05:00.000Z'), 'Europe/Bratislava');
+    expect(due.map((n) => [n.batch_id, n.notice.body])).toEqual([[sealed, 'Burp the jar.']]);
   });
 
   it('tries again while no device gets it', async () => {

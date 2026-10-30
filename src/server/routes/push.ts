@@ -1,10 +1,13 @@
 // Push subscriptions (SPEC §9, §11). Subscribing needs the server, once per
 // device; the endpoint identifies the device, so subscribing again updates it.
+// The reminder rules (SPEC §15.11) are one list, shared by every device and
+// replaced as a whole.
 import { Hono } from 'hono';
 import * as v from 'valibot';
-import { Id } from '../../shared/schemas.ts';
+import { Id, ReminderRules } from '../../shared/schemas.ts';
 import type { AppEnv } from '../auth.ts';
 import { ApiError, jsonBody, meta, type AppContext } from '../http.ts';
+import { reminderRules } from '../nudges.ts';
 import { pushTo } from '../push.ts';
 
 const Endpoint = v.pipe(v.string(), v.url(), v.startsWith('https://'), v.maxLength(2000));
@@ -22,6 +25,28 @@ export function pushRoutes(ctx: AppContext) {
   };
 
   r.get('/push', (c) => c.json({ public_key: ctx.config.vapid?.publicKey ?? null }));
+
+  r.get('/reminders', (c) => c.json(reminderRules(db)));
+
+  r.put('/reminders', jsonBody(ReminderRules), (c) => {
+    const rules = c.req.valid('json');
+    const audit = meta(ctx, c);
+    const created = new Map(
+      (db.prepare('SELECT id, created_at FROM reminder_rules').all() as { id: string; created_at: string }[]).map((r) => [r.id, r.created_at]),
+    );
+    const insert = db.prepare(
+      `INSERT INTO reminder_rules (id, position, action, text, first_day, every_days, hour, created_at, updated_at, author)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    db.transaction(() => {
+      db.prepare('DELETE FROM reminder_rules').run();
+      rules.forEach((r, i) => {
+        const text = r.action === 'custom' ? (r.text ?? null) : null;
+        insert.run(r.id, i, r.action, text, r.first_day, r.every_days, r.hour, created.get(r.id) ?? audit.now, audit.now, audit.author);
+      });
+    })();
+    return c.json(reminderRules(db));
+  });
 
   r.post('/push/subscribe', jsonBody(Subscribe), (c) => {
     sender();

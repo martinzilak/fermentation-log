@@ -262,3 +262,31 @@ export const RecipeEvaluate = v.object({
 });
 
 export const SaveAsRecipe = v.object({ id: Id, name: v.optional(Name) });
+
+// --- Reminder rules (SPEC §15.11) ---
+
+export const REMINDER_ACTIONS = ['photo', 'burp', 'ph', 'custom'] as const;
+export type ReminderAction = (typeof REMINDER_ACTIONS)[number];
+
+const Day = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365));
+
+/** On ferment day first_day (the start date is Day 1), then every every_days days (0: once), from the hour. */
+export const ReminderRule = v.pipe(
+  v.object({
+    id: Id,
+    action: v.picklist(REMINDER_ACTIONS),
+    text: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+    first_day: Day,
+    every_days: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)),
+    // Outside the quiet hours, 22:00–08:00.
+    hour: v.pipe(v.number(), v.integer(), v.minValue(8), v.maxValue(21)),
+  }),
+  v.check((r) => r.action !== 'custom' || !!r.text, 'An own reminder needs its text'),
+);
+export type ReminderRule = v.InferOutput<typeof ReminderRule>;
+
+export const ReminderRules = v.pipe(
+  v.array(ReminderRule),
+  v.maxLength(30),
+  v.check((rules) => new Set(rules.map((r) => r.id)).size === rules.length, 'Two reminders share an id'),
+);

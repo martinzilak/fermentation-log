@@ -190,7 +190,7 @@ export function SettingsScreen() {
         />
       )}
       <p className="mt-2 text-base text-muted-foreground">{t('settings.targetSaltHint')}</p>
-      {data && <Reminders settings={data} />}
+      <Reminders />
     </Screen>
   );
 }

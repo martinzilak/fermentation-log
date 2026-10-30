@@ -136,12 +136,9 @@ export interface RecentLine {
 
 export interface Settings {
   target_salt_pct: number;
-  nudge_hour: number;
-  nudge_day0_photo: 0 | 1;
-  nudge_checks: 0 | 1;
-  nudge_burp: 0 | 1;
-  nudge_ready_days: number;
 }
+
+export type { ReminderAction, ReminderRule } from '../../shared/schemas.ts';
 
 export interface ExportStatus {
   last_export_at: string | null;

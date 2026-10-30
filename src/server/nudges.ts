@@ -1,8 +1,11 @@
-// Nudges (SPEC §9): reminders for fermenting batches, sent by Web Push from
-// the reminder hour on, never in the quiet hours (22:00–08:00). Each batch
-// gets at most one per ferment day, saying everything due that day; whatever
-// was already logged that day is left out. A day whose reminder couldn't go
-// out (no device, server down) is tried again until the quiet hours, then let go.
+// Reminders (SPEC §9, §15.11): a list of rules, each an action on a ferment
+// day (the start date is Day 1), repeating every few days or not, from an
+// hour of the day. They are for fermenting batches; burping only for batches
+// whose container needs it. Rules due for a batch at the same time share one
+// notification, and a rule whose action was already logged that day is left
+// out. A rule that couldn't go out (no device, server down) is tried again
+// until the quiet hours (22:00–08:00), then let go for the day.
+import type { ReminderAction, ReminderRule } from '../shared/schemas.ts';
 import { daysBetween, localDate } from '../shared/calc.ts';
 import type { DB } from './db.ts';
 import { wallClock } from './nightly.ts';
@@ -10,89 +13,80 @@ import { pushTo, type Notice, type PushSender } from './push.ts';
 
 export const QUIET_FROM = 22;
 export const QUIET_UNTIL = 8;
-const CHECK_DAYS = [7, 14];
 const EVERY_MS = 5 * 60_000;
 
-export interface NudgeSettings {
-  hour: number;
-  day0Photo: boolean;
-  checks: boolean;
-  burp: boolean;
-  /** 0 when off. */
-  readyDays: number;
+/** The event that counts as having done an action today. */
+const LOGGED_AS: Partial<Record<ReminderAction, string>> = { photo: 'photo', burp: 'burp', ph: 'ph' };
+
+const TEXT: Record<Exclude<ReminderAction, 'custom'>, string> = {
+  photo: 'Take a photo.',
+  burp: 'Burp the jar.',
+  ph: 'Check the pH: ready to end the ferment?',
+};
+
+export function reminderRules(db: DB): ReminderRule[] {
+  return db.prepare('SELECT id, action, text, first_day, every_days, hour FROM reminder_rules ORDER BY position').all() as ReminderRule[];
 }
 
-export function nudgeSettings(db: DB): NudgeSettings {
-  const rows = new Map(
-    (db.prepare("SELECT key, value FROM settings WHERE key LIKE 'nudge_%'").all() as { key: string; value: string }[]).map((r) => [
-      r.key,
-      Number(r.value),
-    ]),
-  );
-  return {
-    hour: rows.get('nudge_hour') ?? 18,
-    day0Photo: (rows.get('nudge_day0_photo') ?? 1) !== 0,
-    checks: (rows.get('nudge_checks') ?? 1) !== 0,
-    burp: (rows.get('nudge_burp') ?? 0) !== 0,
-    readyDays: rows.get('nudge_ready_days') ?? 14,
-  };
+/** Whether a rule falls on a ferment day (Day 1 is the start date). */
+export function ruleOnDay(rule: Pick<ReminderRule, 'first_day' | 'every_days'>, day: number): boolean {
+  if (day < rule.first_day) return false;
+  return rule.every_days === 0 ? day === rule.first_day : (day - rule.first_day) % rule.every_days === 0;
 }
+
+export const ruleText = (rule: Pick<ReminderRule, 'action' | 'text'>) => (rule.action === 'custom' ? (rule.text ?? '') : TEXT[rule.action]);
 
 export interface Nudge {
   batch_id: string;
   day: number;
+  rule_ids: string[];
   notice: Notice;
 }
 
-/** What to say for a batch on its ferment day, leaving out what was logged today. */
-export function nudgeText(day: number, s: NudgeSettings, logged: Set<string>): string | null {
-  const check = s.checks && CHECK_DAYS.includes(day);
-  const photo = ((day === 0 && s.day0Photo) || check) && !logged.has('photo');
-  const ph = check && !logged.has('ph');
-  const parts = [
-    photo && ph ? 'Take a photo and measure the pH.' : photo ? 'Take a photo.' : ph ? 'Measure the pH.' : null,
-    s.burp && day >= 1 && !logged.has('burp') ? 'Burp the jar.' : null,
-    s.readyDays > 0 && day === s.readyDays ? 'Ready for the next step?' : null,
-  ].filter((p): p is string => p !== null);
-  return parts.length ? parts.join(' ') : null;
-}
-
-/** The reminders due now that haven't been sent. */
+/** The reminders due now that haven't been sent, one per batch. */
 export function dueNudges(db: DB, now: Date, timeZone: string): Nudge[] {
-  const s = nudgeSettings(db);
   const { hour } = wallClock(now.getTime(), timeZone);
-  if (hour < s.hour || hour >= QUIET_FROM || hour < QUIET_UNTIL) return [];
+  if (hour >= QUIET_FROM || hour < QUIET_UNTIL) return [];
+  const rules = reminderRules(db).filter((r) => r.hour <= hour);
+  if (rules.length === 0) return [];
   const today = localDate(now.toISOString(), timeZone);
   const batches = db
     .prepare(
-      `SELECT b.id, b.number, b.name,
-              (SELECT s.date FROM steps s WHERE s.batch_id = b.id AND s.type = 'ferment' ORDER BY s.position LIMIT 1) AS ferment_date
+      `SELECT b.id, b.number, b.name, f.date AS ferment_date, json_extract(f.params, '$.needs_burping') AS burp
          FROM batches b
-        WHERE b.deleted_at IS NULL AND b.status = 'fermenting'
+         JOIN steps f ON f.id = (SELECT s.id FROM steps s WHERE s.batch_id = b.id AND s.type = 'ferment' ORDER BY s.position LIMIT 1)
+        WHERE b.deleted_at IS NULL AND b.status = 'fermenting' AND f.date IS NOT NULL
         ORDER BY b.number`,
     )
-    .all() as { id: string; number: number; name: string | null; ferment_date: string | null }[];
-  const sent = db.prepare('SELECT 1 FROM nudges_sent WHERE batch_id = ? AND day = ?');
+    .all() as { id: string; number: number; name: string | null; ferment_date: string; burp: number | null }[];
+  const sent = db.prepare('SELECT 1 FROM reminders_sent WHERE batch_id = ? AND rule_id = ? AND day = ?');
   // Two days back covers today in any zone.
   const events = db.prepare('SELECT type, occurred_at FROM events WHERE batch_id = ? AND occurred_at >= ?');
   const since = new Date(now.getTime() - 2 * 86_400_000).toISOString();
 
   const due: Nudge[] = [];
   for (const b of batches) {
-    if (!b.ferment_date) continue;
-    const day = daysBetween(b.ferment_date, today);
-    if (day < 0 || sent.get(b.id, day)) continue;
+    const day = daysBetween(b.ferment_date, today) + 1;
     const logged = new Set(
       (events.all(b.id, since) as { type: string; occurred_at: string }[])
         .filter((e) => localDate(e.occurred_at, timeZone) === today)
         .map((e) => e.type),
     );
-    const body = nudgeText(day, s, logged);
+    const mine = rules.filter(
+      (r) =>
+        ruleOnDay(r, day) &&
+        (r.action !== 'burp' || b.burp === 1) &&
+        !(LOGGED_AS[r.action] && logged.has(LOGGED_AS[r.action]!)) &&
+        !sent.get(b.id, r.id, day),
+    );
+    // The same words twice (two photo rules on one day) say it once.
+    const body = [...new Set(mine.map(ruleText))].join(' ');
     if (!body) continue;
     due.push({
       batch_id: b.id,
       day,
-      notice: { title: `#${b.number}${b.name ? ` ${b.name}` : ''} · day ${day}`, body, url: `/b/${b.id}`, tag: `batch-${b.id}` },
+      rule_ids: mine.map((r) => r.id),
+      notice: { title: `#${b.number}${b.name ? ` ${b.name}` : ''} · Day ${day}`, body, url: `/b/${b.id}`, tag: `batch-${b.id}` },
     });
   }
   return due;
@@ -107,10 +101,11 @@ export interface NudgeDeps {
 /** Sends what is due; a reminder counts as sent once a device got it. */
 export async function runNudges({ db, timeZone, send }: NudgeDeps, now = new Date()): Promise<number> {
   if (!db.prepare('SELECT 1 FROM push_subscriptions LIMIT 1').get()) return 0;
+  const record = db.prepare('INSERT OR IGNORE INTO reminders_sent (batch_id, rule_id, day, sent_at) VALUES (?, ?, ?, ?)');
   let sent = 0;
   for (const n of dueNudges(db, now, timeZone)) {
     if ((await pushTo(db, send, n.notice)) === 0) continue;
-    db.prepare('INSERT OR IGNORE INTO nudges_sent (batch_id, day, sent_at) VALUES (?, ?, ?)').run(n.batch_id, n.day, now.toISOString());
+    for (const id of n.rule_ids) record.run(n.batch_id, id, n.day, now.toISOString());
     sent++;
   }
   return sent;

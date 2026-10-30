@@ -20,8 +20,8 @@ function stamp(method: string, url: string, body: unknown): unknown {
   return { ...body, occurred_at: new Date().toISOString() };
 }
 
-async function request<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, body?: unknown): Promise<T> {
-  if (method !== 'GET' && usesOutbox(method, url)) return (await outbox.send(method, url, stamp(method, url, body))) as T;
+async function request<T>(method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<T> {
+  if (method !== 'GET' && method !== 'PUT' && usesOutbox(method, url)) return (await outbox.send(method, url, stamp(method, url, body))) as T;
   const json = body !== undefined && !(body instanceof FormData);
   let res: Response;
   try {
@@ -51,5 +51,6 @@ export const api = {
   get: <T>(url: string) => request<T>('GET', url),
   post: <T>(url: string, body: unknown) => request<T>('POST', url, body),
   patch: <T>(url: string, body: unknown) => request<T>('PATCH', url, body),
+  put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
   del: (url: string, body?: unknown) => request<void>('DELETE', url, body),
 };
