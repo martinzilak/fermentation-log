@@ -41,7 +41,7 @@ describe('push subscriptions (SPEC §9)', () => {
     t = testApp(undefined, undefined, undefined, null);
     expect((await t.call('GET', '/api/push')).body).toEqual({ public_key: null });
     const res = await t.call('POST', '/api/push/subscribe', { id: id(), endpoint: 'https://web.push.apple.com/a', keys });
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(409);
   });
 
   it('subscribes a device once, tests it, and drops it when it is gone', async () => {

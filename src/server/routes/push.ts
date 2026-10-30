@@ -17,7 +17,7 @@ export function pushRoutes(ctx: AppContext) {
   const { db } = ctx;
   const r = new Hono<AppEnv>();
   const sender = () => {
-    if (!ctx.push) throw new ApiError(503, 'Reminders are not set up on the server (VAPID keys)');
+    if (!ctx.push) throw new ApiError(409, 'Reminders are not set up on the server (VAPID keys)');
     return ctx.push;
   };
 
