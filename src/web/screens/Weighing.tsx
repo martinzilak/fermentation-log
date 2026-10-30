@@ -449,34 +449,30 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           subtitle={liveStats(pending, true, pick.line?.id)}
           footer={numpadFooter(() => go({ name: 'pick' }), () => void nextFromGrams(pick))}
         >
-          {pick.line ? (
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                {container !== null && <span className="block text-lg text-muted-foreground">{t('weigh.onScale')}</span>}
-                <Readout value={value} unit="g" />
-                {/* With a container on, the net is what's compared; it gets its own line below. */}
-                {container === null && dev && <p className="text-xl tabular-nums">{dev}</p>}
-              </div>
-              <p className="text-right">
-                <span className="block text-lg text-muted-foreground">{t(planned?.estimate ? 'weigh.about' : 'weigh.planLabel')}</span>
-                <span className="text-5xl font-bold tabular-nums">{planned?.grams != null ? formatNumber(planned.grams) : '—'}</span>
-                {planned?.grams != null && <span className="ml-1 text-3xl font-medium text-muted-foreground">g</span>}
-                {planned?.grams == null && <span className="block text-base text-muted-foreground">{planText(planned)}</span>}
-              </p>
-            </div>
-          ) : (
-            <>
-              {container !== null && <span className="block text-lg text-muted-foreground">{t('weigh.onScale')}</span>}
-              <Readout value={value} unit="g" />
-            </>
-          )}
-          {container !== null && net !== null && (
-            <p className="mt-2 text-4xl font-bold tabular-nums">
-              {t('weigh.net', { g: formatGrams(round2(net)) })}
-              {dev && <span className="ml-3 text-xl font-normal">{dev}</span>}
-            </p>
-          )}
-          {container !== null && <p className="mt-1 text-lg text-muted-foreground">{t('weigh.containerHint', { g: formatGrams(container) })}</p>}
+          {/* With a container on, the net is what's compared: it gets the panel's second line. */}
+          <Readout
+            value={value}
+            unit="g"
+            label={container !== null ? t('weigh.onScale') : undefined}
+            aside={
+              !pick.line
+                ? undefined
+                : planned?.grams != null
+                  ? `${t(planned.estimate ? 'weigh.about' : 'weigh.planLabel')} ${formatGrams(planned.grams)}`
+                  : planText(planned)
+            }
+            fill={planned?.grams && !planned.estimate && net !== null ? net / planned.grams : null}
+            below={
+              container !== null &&
+              net !== null && (
+                <span className="font-display text-4xl font-bold tracking-normal text-lcd-foreground normal-case">
+                  {t('weigh.net', { g: formatGrams(round2(net)) })}
+                </span>
+              )
+            }
+            tag={dev}
+          />
+          {container !== null && <p className="mt-2 text-lg text-muted-foreground">{t('weigh.containerHint', { g: formatGrams(container) })}</p>}
           <Button
             variant="outline"
             className="mt-3 w-full"

@@ -68,8 +68,7 @@ export function PhEvent({ batchId }: { batchId: string }) {
         ))}
       </Chips>
       <div className="mt-4">
-        <Readout value={value} />
-        {ph !== null && ph <= 14 && <PhLabel value={ph} className="text-2xl" />}
+        <Readout value={value} label="pH" below={ph !== null && ph <= 14 && <PhLabel value={ph} className="text-lg tracking-normal text-lcd-foreground normal-case" />} />
       </div>
       <Button variant="ghost" className="mt-2 px-0 underline" onClick={() => navigate('/ph-info')}>
         {t('ph.whatMeans')}

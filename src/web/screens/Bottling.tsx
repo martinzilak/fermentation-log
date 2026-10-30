@@ -363,8 +363,7 @@ function BottlingFlow({ batch }: { batch: BatchView }) {
             <Chip onClick={() => navigate('/ph-info')}>{t('ph.whatMeans')}</Chip>
           </Chips>
           <div className="mt-3">
-            <Readout value={value} />
-            {typed !== null && typed <= 14 && <PhLabel value={typed} className="text-2xl" />}
+        <Readout value={value} label="pH" below={typed !== null && typed <= 14 && <PhLabel value={typed} className="text-lg tracking-normal text-lcd-foreground normal-case" />} />
           </div>
         </Screen>
       );
