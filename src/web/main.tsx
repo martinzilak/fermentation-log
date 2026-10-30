@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { hydrate } from './lib/query.ts';
 import { startSync } from './lib/sync.ts';
+import './fonts.ts';
 import './styles.css';
 
 startSync();

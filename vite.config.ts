@@ -42,8 +42,14 @@ export default defineConfig({
         // Shows reminders and opens the batch on a tap (SPEC §9).
         importScripts: ['/push-sw.js'],
         navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/healthz/],
-        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        // Fonts: the latin files up front; other subsets once a name needs them.
+        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}', '**/*-latin-[0-9]*.woff2'],
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith('.woff2'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'fonts', cacheableResponse: { statuses: [200] } },
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/media/'),
             handler: 'CacheFirst',
