@@ -201,6 +201,7 @@ const en = {
   'detail.steps': 'Steps',
   'detail.noSteps': 'No steps yet.',
   'detail.addIngredients': 'Add ingredients',
+  'detail.weighRest': 'Weigh the rest ({n} left)',
   'detail.tare': 'tare {g}',
   'detail.timeline': 'Timeline',
   'detail.noEvents': 'Nothing logged yet.',
@@ -252,7 +253,7 @@ const en = {
 
   'event.save': 'Save',
   'event.noteOptional': 'Note (optional)',
-  'event.weighAction': 'Weigh',
+  'event.weighAction': 'Weigh the crock',
   'event.weighTitle': 'Whole crock on the scale',
   'event.weighTare': 'Empty crock {g}',
   'event.weighed': 'Weighed {g}',

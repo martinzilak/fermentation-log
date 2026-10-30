@@ -1,5 +1,6 @@
 // Add a step (SPEC §8.2 item 3): pick the type, and weighing mode opens for
-// its additions. The step is saved on the tap, dated today unless changed.
+// its additions (a cook, strain or rest with none goes back to the batch).
+// The step is saved on the tap, dated today unless changed.
 // In a batch from a recipe, the recipe's next step is offered first, with its
 // method; the step gets the lines of the matching recipe step to weigh, and a
 // mash line first when their plan depends on it.
@@ -44,7 +45,9 @@ export function AddStep({ batchId }: { batchId: string }) {
     });
     if (!saved) return;
     invalidate('/api/batches');
-    navigate(`${detail}/s/${id}`, { replace: true });
+    // A cook, strain or rest with nothing from the recipe has nothing to weigh.
+    const weighs = lines.length > 0 || type === 'blend' || type === 'other';
+    navigate(weighs ? `${detail}/s/${id}` : detail, { replace: true });
     toast.show(t('step.added', { type: stepTypeLabel(type) }), async () => {
       await api.del(`/api/steps/${id}`);
       invalidate('/api/batches');

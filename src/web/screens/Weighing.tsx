@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { kindLabel, stepTypeLabel, t } from '@/lib/i18n';
 import { formatGrams, formatNumber, formatPct, parseDecimal } from '@/lib/numbers';
-import { calcSteps as batchCalcSteps, planFor, type Plan } from '@/lib/plan';
+import { calcSteps as batchCalcSteps, planFor, recipeStepNote, type Plan } from '@/lib/plan';
 import { invalidate, missingTitle, refresh, useQuery } from '@/lib/query';
 import { goBack } from '@/lib/router';
 import { suggest, type Pick } from '@/lib/suggest';
@@ -104,6 +104,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
   const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
   const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch.recipe_id);
   const plan = (line: LineView) => planFor(line, step, batch, recipe);
+  const method = recipeStepNote(recipe, batch, step.id);
 
   // Lines planned from a recipe are there before anything is weighed.
   const needsTare = step.type === 'ferment' && step.params.vessel_tare_g == null && step.lines.every((l) => l.grams === null);
@@ -285,6 +286,7 @@ function WeighingFlow({ batch, step }: { batch: BatchView; step: StepView }) {
           }
         >
           {liveStats()}
+          {method && <p className="mt-3 text-base whitespace-pre-line text-muted-foreground">{method}</p>}
           {toWeigh.length > 0 && (
             <section className="mt-4">
               <h2 className="mb-2 text-lg text-muted-foreground">{t('weigh.toWeigh')}</h2>

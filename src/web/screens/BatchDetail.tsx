@@ -14,7 +14,8 @@ import { acceptPress } from '@/lib/press';
 import { saltWarning } from '@/lib/salt';
 import { missingTitle, useQuery } from '@/lib/query';
 import { goBack, navigate } from '@/lib/router';
-import type { Attachment, BatchView, BottleType, EventView, Fill, Settings, StepView, Vessel } from '@/lib/types';
+import { recipeStepNote } from '@/lib/plan';
+import type { Attachment, BatchView, BottleType, EventView, Fill, RecipeView, Settings, StepView, Vessel } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 
@@ -24,6 +25,7 @@ export function BatchDetail({ id }: { id: string }) {
   const vessels = useQuery<Vessel[]>('/api/vessels').data ?? [];
   const bottleTypes = useQuery<BottleType[]>('/api/bottle-types').data ?? [];
   const targetPct = useQuery<Settings>('/api/settings').data?.target_salt_pct ?? 3;
+  const recipe = useQuery<RecipeView[]>('/api/recipes').data?.find((r) => r.id === batch?.recipe_id);
   const [viewing, setViewing] = useState<Attachment | null>(null);
 
   if (!batch) {
@@ -116,7 +118,14 @@ export function BatchDetail({ id }: { id: string }) {
       {batch.steps.length === 0 && <p className="text-muted-foreground">{t('detail.noSteps')}</p>}
       <div className="flex flex-col gap-4">
         {batch.steps.map((s) => (
-          <StepCard key={s.id} step={s} vessels={vessels} onAdd={() => navigate(`/b/${id}/s/${s.id}`)} />
+          <StepCard
+            key={s.id}
+            step={s}
+            vessels={vessels}
+            method={recipeStepNote(recipe, batch, s.id)}
+            onAdd={() => navigate(`/b/${id}/s/${s.id}`)}
+            onLine={(lineId) => navigate(`/b/${id}/l/${lineId}`)}
+          />
         ))}
       </div>
 
@@ -153,9 +162,19 @@ function Stat({ label, children, note, wide = false, warn = false }: StatProps) 
   );
 }
 
-function StepCard({ step, vessels, onAdd }: { step: StepView; vessels: Vessel[]; onAdd: () => void }) {
+interface StepCardProps {
+  step: StepView;
+  vessels: Vessel[];
+  /** The recipe step's method. */
+  method: string | null;
+  onAdd: () => void;
+  onLine: (lineId: string) => void;
+}
+
+function StepCard({ step, vessels, method, onAdd, onLine }: StepCardProps) {
   const vessel = vessels.find((v) => v.id === step.params.vessel_id);
   const tare = step.params.vessel_tare_g;
+  const left = step.lines.filter((l) => l.grams === null).length;
   return (
     <section className="rounded-xl border bg-card">
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 px-4 pt-3">
@@ -167,24 +186,32 @@ function StepCard({ step, vessels, onAdd }: { step: StepView; vessels: Vessel[];
           {[vessel?.name, tare != null ? t('detail.tare', { g: formatGrams(tare) }) : null].filter(Boolean).join(' · ')}
         </p>
       )}
+      {method && <p className="px-4 pt-1 text-base whitespace-pre-line text-muted-foreground">{method}</p>}
       {step.lines.length > 0 && (
         <ul className="mt-2 divide-y border-t">
           {step.lines.map((l) => (
-            <li key={l.id} className="flex justify-between gap-4 px-4 py-2 text-lg">
-              <span>{l.name}</span>
-              <span className="shrink-0 text-right tabular-nums">
-                {l.grams === null ? (l.planned_g === null ? '—' : '') : formatGrams(l.grams)}
-                {l.planned_g !== null && (
-                  <span className="block text-base text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
-                )}
-              </span>
+            <li key={l.id}>
+              {/* Tapping a line opens it for correcting. */}
+              <button
+                type="button"
+                onClick={(e) => acceptPress(e) && onLine(l.id)}
+                className="flex w-full justify-between gap-4 px-4 py-2 text-left text-lg active:bg-accent"
+              >
+                <span>{l.name}</span>
+                <span className="shrink-0 text-right tabular-nums">
+                  {l.grams === null ? (l.planned_g === null ? '—' : '') : formatGrams(l.grams)}
+                  {l.planned_g !== null && (
+                    <span className="block text-base text-muted-foreground">{t('weigh.plan', { g: formatGrams(l.planned_g) })}</span>
+                  )}
+                </span>
+              </button>
             </li>
           ))}
         </ul>
       )}
       <div className="p-3">
         <Button variant="outline" className="w-full" onClick={onAdd}>
-          {t('detail.addIngredients')}
+          {left > 0 ? t('detail.weighRest', { n: left }) : t('detail.addIngredients')}
         </Button>
       </div>
     </section>

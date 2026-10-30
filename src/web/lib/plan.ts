@@ -26,6 +26,13 @@ function planSteps(steps: StepView[], without?: string): CalcStep[] {
   return calcSteps(steps.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, grams: l.grams ?? l.planned_g })) })), without);
 }
 
+/** The method of the recipe step a batch step follows. */
+export function recipeStepNote(recipe: RecipeView | undefined, batch: BatchView, stepId: string): string | null {
+  if (!recipe) return null;
+  const index = recipeStepFor(recipe.steps, batch.steps, stepId);
+  return recipe.steps.find((s) => s.step_index === index)?.note ?? null;
+}
+
 /** The recipe lines a batch step follows. */
 export function recipeLinesFor(recipe: RecipeView, batch: BatchView, stepId: string): RecipeLineView[] {
   const index = recipeStepFor(recipe.steps, batch.steps, stepId);
