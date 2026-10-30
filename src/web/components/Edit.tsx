@@ -181,7 +181,11 @@ export function NumberField({ label, value, onSave, min = 0, max = Infinity, int
 }
 
 /** A big list row that opens something. */
-export function LinkRow({ title, hint, onClick }: { title: ReactNode; hint?: ReactNode; onClick: () => void }) {
+/**
+ * A row that opens something. A menu entry (`menu`) is the app's own words and
+ * set in capitals; a row naming someone's data stays as typed (SPEC §15.13).
+ */
+export function LinkRow({ title, hint, onClick, menu = false }: { title: ReactNode; hint?: ReactNode; onClick: () => void; menu?: boolean }) {
   return (
     <button
       type="button"
@@ -189,7 +193,7 @@ export function LinkRow({ title, hint, onClick }: { title: ReactNode; hint?: Rea
       className="flex min-h-16 w-full items-center gap-3 rounded-xl border bg-card px-4 py-2 text-left active:bg-accent"
     >
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-lg font-medium">{title}</span>
+        <span className={menu ? 'font-display text-2xl leading-tight font-bold tracking-wide uppercase' : 'text-lg font-medium'}>{title}</span>
         {hint && <span className="text-base text-muted-foreground">{hint}</span>}
       </span>
       <ChevronRight className="size-6 shrink-0 text-muted-foreground" />

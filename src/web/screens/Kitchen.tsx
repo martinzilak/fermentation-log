@@ -26,12 +26,13 @@ export function MoreMenu() {
   return (
     <Screen title={t('kitchen.title')} footer={<BackButton to="/" />}>
       <RowList>
-        <LinkRow title={t('catalog.title')} hint={t('more.catalogHint')} onClick={() => navigate('/catalog')} />
-        <LinkRow title={t('varieties.title')} hint={t('more.varietiesHint')} onClick={() => navigate('/varieties')} />
-        <LinkRow title={t('bottles.title')} hint={t('more.bottlesHint')} onClick={() => navigate('/bottle-types')} />
-        <LinkRow title={t('recipes.title')} hint={t('more.recipesHint')} onClick={() => navigate('/recipes')} />
-        <LinkRow title={t('export.title')} hint={t('more.exportHint')} onClick={() => navigate('/export')} />
+        <LinkRow menu title={t('catalog.title')} hint={t('more.catalogHint')} onClick={() => navigate('/catalog')} />
+        <LinkRow menu title={t('varieties.title')} hint={t('more.varietiesHint')} onClick={() => navigate('/varieties')} />
+        <LinkRow menu title={t('bottles.title')} hint={t('more.bottlesHint')} onClick={() => navigate('/bottle-types')} />
+        <LinkRow menu title={t('recipes.title')} hint={t('more.recipesHint')} onClick={() => navigate('/recipes')} />
+        <LinkRow menu title={t('export.title')} hint={t('more.exportHint')} onClick={() => navigate('/export')} />
         <LinkRow
+          menu
           title={t('settings.title')}
           hint={settings ? t('settings.saltHint', { pct: formatPct(settings.target_salt_pct) }) : undefined}
           onClick={() => navigate('/settings')}
