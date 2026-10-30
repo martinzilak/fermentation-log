@@ -13,8 +13,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Findable, not inviting: outlined, so it never outranks the screen's action.
         destructive:
-          "bg-destructive text-primary-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
+          "border-2 border-destructive bg-transparent text-destructive hover:bg-destructive/10 active:bg-destructive/10 focus-visible:ring-destructive/20",
         outline:
           "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground active:bg-accent",
         secondary:
